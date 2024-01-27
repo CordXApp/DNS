@@ -1,0 +1,37 @@
+{
+  "name": "@cordxapp/dns",
+  "version": "1.0.0",
+  "description": "Simple API for handling our DNS related services.",
+  "main": "src/server.ts",
+  "private": true,
+  "scripts": {
+    "dev": "nodemon --exec npx ts-node src/server.ts",
+    "start": "npx ts-node src/server.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CordXApp/DNS.git"
+  },
+  "author": "Toxic Dev",
+  "dependencies": {
+    "@fastify/cors": "8.5.0",
+    "@fastify/compress": "^6.4.0",
+    "@fastify/helmet": "^11.0.0",
+    "@fastify/swagger": "^7.6.0",
+    "@fastify/rate-limit": "9.1.0",
+    "@fastify/under-pressure": "^8.3.0",
+    "boom": "^7.3.0",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.22.1",
+    "fastify-custom-healthcheck": "^3.1.0",
+    "mongoose": "^8.0.2",
+    "moment": "^2.29.4",
+    "nodemon": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.7",
+    "@types/boom": "^7.3.5",
+    "del-cli": "^5.1.0",
+    "typescript": "^5.2.2"
+  }
+}
