@@ -3,15 +3,14 @@ import { KeyErrors } from "../../types/err.types";
 import { KeyModel } from "../../schemas/keys.schema";
 import { InstanceClient } from "../instances/instance.client";
 import * as Typings from '../../types/db.types';
-import { version } from '../../../package.json';
-import crypto from 'crypto';
 import { IInstance } from "../../types/instance";
 import { createKeyError } from "../../res/errors";
+import crypto from 'crypto';
 
 export class Keys {
     private static client: Keys;
     public instance: IInstance;
-    public model: typeof KeyModel = KeyModel;
+    public model = KeyModel;
     public static version: string = 'v0.0.1-beta';
     private static errors: typeof KeyErrors = KeyErrors;
 
@@ -20,14 +19,17 @@ export class Keys {
         Keys.client = this
 
         const instance = InstanceClient.get('CordX:KeyManager', {
-            class: Keys,
             model: this.model,
             errors: Keys.errors,
             version: Keys.version,
-            create: this.create
+            create: this.create,
+            random: this.random
+
         })
 
         this.instance = instance;
+
+        Keys.cleanup()
     }
 
     public static health(): string {
@@ -52,31 +54,27 @@ export class Keys {
 
         for (const key of keys) {
             if (!key.version || key.version !== this.version) {
-                await this.client.model.updateOne({ key: key.key }, { version: this.version }).catch((err: Error) => {
-                    return this.client.instance.logs?.trace(this.errors['KEY_VERSION_UPDATE_FAILED']({
-                        key: key.key,
-                        error: err.stack
-                    }));
+                await this.client.model.updateOne({ key: key.key }, { version: this.version }).then(() => {
+                    this.client.instance.logs?.success(`Updated version for ${key.admin ? 'Admin Key' : 'Base Key'}: ${key.key}`)
+                }).catch((err: Error) => {
+                    this.client.instance.logs?.error(`Failed to update version for key: ${key.key}`)
+                    return this.client.instance.logs?.fatal(`Error: ${err.stack}`)
                 })
-                this.client.instance.logs?.trace(this.errors['KEY_VERSION_UPDATE_SUCCESS']({
-                    msg: 'Cleaned up outdated keys',
-                    key: key.key,
-                    version: Keys.version,
-                }));
+
+                this.client.instance.logs?.success(`All keys are up-to date`);
             }
 
             if (key.createdAt < inactive) {
                 try {
-                    await this.client.model.deleteOne({ key: key.key });
-                    this.client.instance.logs?.trace(this.errors['KEY_DELETE_SUCCESS']({
-                        msg: 'Cleaned up inactive keys',
-                        key: key.key,
-                    }));
+                    this.client.instance.logs?.success(`Deleting ${key.admin ? 'Admin Key' : 'Base Key'}: ${key.key} for inactivity`);
+
+                    await this.client.model.deleteOne({ key: key.key }).catch((err: any) => {
+                        this.client.instance.logs?.error(`Failed to delete key: ${key.key}`);
+                        return this.client.instance.logs?.fatal(`Error: ${err.stack}`)
+                    });
                 } catch (err) {
-                    return this.client.instance.logs?.trace(this.errors['KEY_DELETE_FAILED']({
-                        key: key.key,
-                        error: err instanceof Error ? err.stack : 'Unknown error'
-                    }));
+                    this.client.instance.logs?.error(`Failed to delete or check key: ${key.key} for inactivity`)
+                    return this.client.instance.logs?.fatal(`Error: ${err instanceof Error ? err.stack : 'Unknown'}`);
                 }
             }
         }
@@ -224,5 +222,18 @@ export class Keys {
                 });
             }
         });
+    }
+
+    public async random(admin: boolean): Promise<Typings.Responses> {
+        let key;
+
+        if (admin) key = this.model.findOne({ admin: true })
+        else key = this.model.findOne({ admin: false })
+
+        return {
+            success: true,
+            status: 'RANDOM_KEY_FETCH',
+            key: key
+        }
     }
 }

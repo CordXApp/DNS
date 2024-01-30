@@ -2,17 +2,20 @@ import { DatabaseErrors } from '../../types/err.types';
 import { InstanceClient } from '../instances/instance.client';
 import { IInstance } from '../../types/instance';
 import * as DBTypes from '../../types/db.types';
-import { Connection } from 'mongoose';
 import { Logger } from '../other/log.client';
-import mongo from 'mongoose';
 import { CordXError } from '../other/error.client';
+import { DNSClient } from './dns.client';
+import { Connection } from 'mongoose';
 import { Keys } from './key.client';
+import mongo from 'mongoose';
 
 export class Database implements DBTypes.Client {
     private static errors: { [status: string]: (details?: any) => Error } = DatabaseErrors;
     private static logger: Logger = Logger.getInstance('CordX:Database', false);
-    public connection: Connection = mongo.connection;
+    private static connection: Connection = mongo.connection;
     private static uri: string = process.env.MONGO_URI as string;
+    public dns: DNSClient = new DNSClient()
+    public keys: Keys = new Keys()
     public instance: IInstance;
 
     public static version: string = 'v0.0.1-beta';
@@ -22,11 +25,13 @@ export class Database implements DBTypes.Client {
         this.instance = InstanceClient.get('CordX:Database', {
             class: Database,
             mongoose: mongo,
-            connection: this.connection,
-            connect: this.connect
+            connection: Database.connection,
+            connect: this.connect,
+            keys: this.keys,
+            dns: this.dns
         })
 
-        this.connection = mongo.connection;
+        Database.connection = mongo.connection;
 
         this.connect().catch((err: Error) => {
             Database.logger.error(Database.errors['DATABASE_CONNECTION_FAILED']({
@@ -47,7 +52,7 @@ export class Database implements DBTypes.Client {
      * @instance IInstance
      */
     public async connect(): Promise<void> {
-        if (this.connection.readyState === 1) {
+        if (Database.connection.readyState === 1) {
             return;
         }
 
@@ -78,7 +83,7 @@ export class Database implements DBTypes.Client {
      * @instance IInstance
      */
     private init(): void {
-        this.connection.on('error', (err: Error) => {
+        Database.connection.on('error', (err: Error) => {
             this.instance.state = 'UNHEALTHY'
             Database.logger.error(err.message);
             this.instance.cleanup().catch((err: Error) => {
@@ -91,7 +96,7 @@ export class Database implements DBTypes.Client {
             })
         });
 
-        this.connection.on('disconnected', () => {
+        Database.connection.on('disconnected', () => {
             this.instance.state = 'DESTROYED';
             Database.logger.warn(`Disconnected from MongoDB at ${Database.maskUri(Database.uri)}`);
             this.instance.cleanup().catch((err: Error) => {
@@ -104,7 +109,7 @@ export class Database implements DBTypes.Client {
             })
         })
 
-        this.connection.on('reconnected', () => {
+        Database.connection.on('reconnected', () => {
             this.instance.state = 'HEALTHY';
             Database.logger.info(`Reconnected to MongoDB at ${Database.maskUri(Database.uri)}`);
         })

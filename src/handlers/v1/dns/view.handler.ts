@@ -1,5 +1,6 @@
 import { Database } from '../../../clients/database/db.client';
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { InstanceClient } from '../../../clients/instances/instance.client';
 
 const Handler = async (req: FastifyRequest<{ Body: { domain: string } }>, res: FastifyReply) => {
     res.header('Content-Type', 'application/json');
@@ -30,9 +31,9 @@ const Handler = async (req: FastifyRequest<{ Body: { domain: string } }>, res: F
 };
 
 const PreHandler = async (req: FastifyRequest<{ Body: { domain: string }, Headers: { Authorization: string, } }>, res: FastifyReply) => {
-    const db = await Database.getInstance();
+    const db = req.db;
     const auth = req.headers['authorization'];
-    const key = await db.keyExists(auth.replace('Bearer ', ''));
+    const key = await db.keys.validate(auth.replace('Bearer ', ''))
     const dom = await req.body.domain;
 
     if (!dom || !req.body) return res.status(400).send({

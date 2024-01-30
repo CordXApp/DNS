@@ -9,11 +9,12 @@ import { InstanceClient } from '../instances/instance.client';
 
 export class DNSClient {
 
-    private instance: IInstance;
+    public instance: IInstance;
     private static logs: Logger;
     public static version: string = 'v0.0.1-beta';
+    private model: typeof UserModel = UserModel;
 
-    private constructor() {
+    constructor() {
         this.instance = InstanceClient.get('CordX:DNS', {
             class: DNSClient,
             keywords: KEYWORDS,
@@ -21,7 +22,8 @@ export class DNSClient {
             blacklisted: this.blacklisted,
             resolve: this.resolve,
             validate: this.validate,
-            verified: this.verified
+            verified: this.verified,
+            model: this.model
         })
     }
 
@@ -33,7 +35,7 @@ export class DNSClient {
      * @tutorial `DNSClient.blacklisted('google.com')`
      */
     public blacklisted = (domain: string): boolean => {
-        const config: BLACKLIST = { blacklist: KEYWORDS };
+        const config: BLACKLIST = { blacklist: this.instance.properties.KEYWORDS };
         const isBlacklisted = config.blacklist.some((key) => domain.toLowerCase().includes(key.toLowerCase()))
 
         DNSClient.logs.info(`Domain ${domain} is ${isBlacklisted ? 'blacklisted' : 'not blacklisted'}.`);
@@ -201,19 +203,19 @@ export class DNSClient {
             const doc = await dom.domains.find((d: any) => d.name === domain);
 
             if (!dom) {
-                DNSClient.logs.error(`Failed to verify domain ${domain}: user does not exist`);
+                DNSClient.logs.error(`Failed to fetch ${domain}: user does not exist`);
                 resolve({ success: false, message: 'User does not exist!' });
                 return;
             }
 
             if (!doc) {
-                DNSClient.logs.error(`Failed to verify domain ${domain}: domain does not exist`);
+                DNSClient.logs.error(`Failed to fetch ${domain}: domain does not exist`);
                 resolve({ success: false, message: 'Domain does not exist.' });
                 return;
             }
 
             if (!doc.verified) {
-                DNSClient.logs.error(`Failed to verify domain ${domain}: domain is not verified`);
+                DNSClient.logs.error(`${domain}:  is not verified`);
                 resolve({ success: false, message: 'Domain is not verified!' });
                 return;
             }
@@ -221,5 +223,20 @@ export class DNSClient {
             DNSClient.logs.info(`${domain} is verified!`);
             resolve({ success: true, message: 'Domain is verified!' });
         })
+    }
+
+    public async domain(domain: string): { success: boolean, message: string, data?: any } {
+        const validate = await this.validate(domain);
+
+        if (!validate.success) return {
+            success: false,
+            message: validate.message
+        }
+
+        const dom = await this.model.findOne({})
+
+        return {
+
+        }
     }
 }

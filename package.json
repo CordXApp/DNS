@@ -23,7 +23,6 @@
     "boom": "^7.3.0",
     "dotenv": "^16.3.1",
     "fastify": "^4.22.1",
-    "fastify-custom-healthcheck": "^3.1.0",
     "mongoose": "^8.0.2",
     "moment": "^2.29.4",
     "nodemon": "^3.0.2"

@@ -3,14 +3,15 @@ import { InstanceErrors } from "../../types/err.types";
 import { IInstance, IInstanceClient } from "../../types/instance";
 import { Logger } from "../other/log.client";
 import { CordXError } from "../other/error.client";
+import { Keys } from "../database/key.client";
 
 export class InstanceClient implements IInstance {
     public static instances: Map<string, IInstance> = new Map();
     private static errors: typeof InstanceErrors = InstanceErrors;
     private static snowflake: CordXSnowflake = new CordXSnowflake();
     private static logger: Logger = Logger.getInstance('INSTANCE:Manager', false)
-    private static idleTimeoutDuration: number = 1000 * 60 * 2;
-    private static warningInterval: number = 1000 * 60 * 1;
+    private static idleTimeoutDuration: number = 1000 * 60 * 20;
+    private static warningInterval: number = 1000 * 60 * 5;
     public static version: string = 'v0.0.1-beta'
     public static state: 'HEALTHY' | 'UNHEALTHY';
 
@@ -51,10 +52,12 @@ export class InstanceClient implements IInstance {
      * @returns {IInstance[]}
      * @memberof InstanceClient
      */
+
     public static healthy(): IInstance[] {
-        return Array.from(this.instances.values()).filter((instance: IInstance) => {
-            return ['HEALTHY', 'BUSY', 'IDLE'].includes(instance.state);
-        });
+        const data = this.instances.values();
+        return Array.from(data).filter((instance: IInstance) => {
+            return ['HEALTHY', 'IDLE', 'BUSY'].includes(instance.state)
+        })
     }
 
     /**
@@ -152,7 +155,6 @@ export class InstanceClient implements IInstance {
 
             if (operation == 'connect') {
                 if (this.properties.hasOwnProperty('connect')) {
-                    this.setState('BUSY');
                     this.properties.connect().then(() => {
                         this.lastUsed = new Date();
                         this.setState('HEALTHY');
@@ -340,13 +342,14 @@ export class InstanceClient implements IInstance {
 
         if (!instance) return;
 
-        instance.state = 'BUSY'
+        instance.setState('BUSY')
 
         if (instance.idleTimeout) {
+            instance.setState('BUSY')
             clearInterval(instance.idleTimeout);
             instance.idleTimeout = null;
             instance.idleStart = null;
-            instance.state = 'IDLE'
+            instance.setState('IDLE')
         }
 
         let count = 0;
@@ -364,43 +367,47 @@ export class InstanceClient implements IInstance {
                     instance.logs?.info('If you wish to keep this instance alive please perform an operation on it to reset its internal state.')
                     count++;
                     if (count >= max) {
-                        instance.state = 'CLEANSING'
-
+                        instance.setState('CLEANSING')
                         instance.logs?.warn(`Instance: ${instance.name}(${instance.id}) has been idle for ${idleDuration / 1000 / 60} minutes.`);
                         instance.logs?.fatal(`This instance has been idle for to long and will be destroyed to prevent memory leaks/overloads.`)
 
-                        this.cleanup().catch((err: Error) => {
-                            instance.state = 'UNHEALTHY'
+                        this.cleanup().then(() => {
+                            instance.setState('CLEANSED')
+                            instance.logs?.success(`Instance: ${instance.name}(${instance.id}) has been cleaned up successfully!`);
+                        }).catch((err: Error) => {
+                            instance.setState('UNHEALTHY')
                             instance.logs?.warn(`Instance: ${instance.name}(${instance.id}) encountered an error during cleanup`);
                             return instance.logs?.fatal(`Error: ${err.stack}`)
                         })
                         instance.destroy().catch((err: Error) => {
-                            instance.state = 'UNHEALTHY'
+                            instance.setState('UNHEALTHY')
                             instance.logs?.warn(`Failed to destroy instance: ${instance.name}(${instance.id})`);
                             return instance.logs?.fatal(`Error: ${err.message}`)
                         })
                     }
                 } else {
 
-                    instance.state = 'CLEANSING'
+                    instance.setState('CLEANSING')
 
                     instance.logs?.warn(`Instance: ${instance.name}(${instance.id}) has been idle for ${idleDuration / 1000 / 60} minutes.`);
                     instance.logs?.fatal(`This instance has been idle for to long and will be destroyed to prevent memory leaks/overloads.`)
 
                     this.cleanup().catch((err: Error) => {
-                        instance.state = 'UNHEALTHY'
+                        instance.setState('UNHEALTHY')
                         instance.logs?.warn(`Instance: ${instance.name}(${instance.id}) encountered an error during cleanup`);
                         return instance.logs?.fatal(`Error: ${err.stack}`)
                     })
-                    instance.state = 'DESTROYED'
+                    instance.setState('DESTROYED')
                     instance.destroy().catch((err: Error) => {
-                        instance.state = 'UNHEALTHY'
+                        instance.setState('UNHEALTHY')
                         instance.logs?.warn(`Failed to destroy instance: ${instance.name}(${instance.id})`);
                         return instance.logs?.fatal(`Error: ${err.message}`)
                     });
                 }
             }
         }
+
+        instance.setState('HEALTHY')
 
         instance.idleTimeout = setInterval(warnAndClose, InstanceClient.warningInterval);
     }
