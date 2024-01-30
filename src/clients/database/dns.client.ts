@@ -35,10 +35,19 @@ export class DNSClient {
      * @tutorial `DNSClient.blacklisted('google.com')`
      */
     public blacklisted = (domain: string): boolean => {
-        const config: BLACKLIST = { blacklist: this.instance.properties.KEYWORDS };
-        const isBlacklisted = config.blacklist.some((key) => domain.toLowerCase().includes(key.toLowerCase()))
 
-        DNSClient.logs.info(`Domain ${domain} is ${isBlacklisted ? 'blacklisted' : 'not blacklisted'}.`);
+        this.instance.setLastUsed()
+        this.instance.setState('BUSY');
+
+        const config: BLACKLIST = { blacklist: KEYWORDS };
+        const isBlacklisted = config.blacklist.some((key) => {
+
+            console.log(`Domain: ${domain.toLowerCase()} contains blacklisted keyword: ${key}`)
+
+            return domain.toLowerCase().includes(key.toLowerCase())
+        })
+
+        this.instance.setState('HEALTHY');
 
         return isBlacklisted;
     }
@@ -225,19 +234,24 @@ export class DNSClient {
         })
     }
 
-    public async domain(domain: string): Promise<{ success: boolean, message?: string, data?: any }> {
-        const validate = await this.validate(domain);
+    public async fetch(domain: string): Promise<DNSResponses['fetch']> {
+        const dom = await this.model.findOne({ 'domains.name': domain });
 
-        if (!validate.success) return {
+        if (!dom) return {
             success: false,
-            message: validate.message
+            message: 'Provided domain is not registered in our system.',
         }
 
-        const dom = await this.model.findOne({})
+        const doc = await dom.domains.filter((d) => d.name == domain);
+
+        if (!doc) return {
+            success: false,
+            message: 'Provided domain is not registered in our system.'
+        }
 
         return {
             success: true,
-            data: dom
+            domain: doc[0]
         }
     }
 }

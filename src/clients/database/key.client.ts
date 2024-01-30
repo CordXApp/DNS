@@ -25,8 +25,8 @@ export class Keys {
             errors: Keys.errors,
             version: Keys.version,
             create: this.create,
-            random: this.random
-
+            random: this.random,
+            validate: this.validate
         })
 
         this.instance = instance;
@@ -61,7 +61,6 @@ export class Keys {
             await this.client.instance.logs?.warn(`No admin level api keys found, creating one now...`);
             await this.client.create(true).then(async (key) => {
                 this.client.instance.logs?.success(`Successfully created a new base level api key in our database.`);
-                this.client.instance.logs?.success(`Please add this to your ".env" file: "ADMIN_KEY=${key.key}"`);
             }).catch((err: Error) => {
                 this.client.instance.logs?.fatal(`Error creating api key: ${err.stack}`);
                 return process.exit(1);
@@ -76,9 +75,6 @@ export class Keys {
 
         if (!env) {
             this.client.instance.logs?.error(`Env validation failed: please make sure you have a ".env" file in your root directory`);
-            return process.exit(1);
-        } else if (env.ADMIN_KEY) {
-            this.client.instance.logs?.fatal(`Env validation failed: please remove the "ADMIN_KEY" variable from your ".env" file, admin keys are handled internally.`);
             return process.exit(1);
         } else if (!env.BASE_KEY) {
             this.client.instance.logs?.fatal(`Env validation failed: please make sure you have a "BASE_KEY" variable with a valid CordX API KEY`);
@@ -205,81 +201,65 @@ export class Keys {
         }
     }
 
-    public async validate(key: string): Promise<Typings.Responses> {
-        return new Promise(async (resolve, reject) => {
-            const env = process.env;
-            const keyDoc = await this.model.findOne({ key });
+    /**
+     * @function validate
+     * @description Validate a key and return the status.
+     * @param {string} key The key to validate.
+     * @param {Typings.KeyType['level']} requires The level of access required.
+     * @returns {Promise<Typings.Responses>}
+     * @memberof Keys
+     */
+    public async validate(key: string, requires: Typings.KeyType['level']): Promise<Typings.Responses> {
 
-            if (!env || !env.ADMIN_KEY || !env.API_KEY) {
-                return reject({
-                    success: false,
-                    status: 'ENV_VALIDATION_FAILED',
-                    message: await createKeyError()
-                });
+        if (key.startsWith('Bearer ')) {
+
+            const doc = await this.model.findOne({ key: key.replace('Bearer ', '') });
+
+            if (!doc) return {
+                success: false,
+                status: 'KEY_NOT_FOUND',
+                message: createKeyError(),
+                code: 404
             }
 
-            if (key.startsWith('Bearer ')) {
-
-                if (!keyDoc) return reject({
-                    success: false,
-                    status: 'KEY_NOT_FOUND',
-                    message: await createKeyError()
-                });
-
-                if (keyDoc.admin) return reject({
-                    success: false,
-                    status: 'INVALID_KEY_TYPE',
-                    message: await createKeyError(),
-                    reason: 'Please use a base level api key for this action.'
-                })
-
-                if (env.BASE_KEY !== keyDoc.key) return reject({
-                    success: false,
-                    status: 'API_KEY_MISMATCH',
-                    message: await createKeyError()
-                })
-
-                return resolve({
-                    success: true,
-                    message: 'Successfully validated the key.',
-                    key: keyDoc
-                })
-
-            } else if (key.startsWith('CordXAdmin ')) {
-
-                if (!keyDoc) return reject({
-                    success: false,
-                    status: 'KEY_NOT_FOUND',
-                    message: await createKeyError()
-                });
-
-                if (!keyDoc.admin) return reject({
-                    success: false,
-                    status: 'INVALID_KEY_TYPE',
-                    message: await createKeyError(),
-                    reason: 'Please use an admin level api key for this action.'
-                })
-
-                if (env.ADMIN_KEY !== keyDoc.key) return reject({
-                    success: false,
-                    status: 'API_KEY_MISMATCH',
-                    message: await createKeyError()
-                })
-
-                return resolve({
-                    success: true,
-                    message: 'Successfully validated the key.',
-                    key: keyDoc
-                })
-
-            } else {
-                return reject({
-                    success: false,
-                    status: 'KEY_VALIDATION_FAILED',
-                    message: await createKeyError()
-                });
+            if (requires == 'ADMIN') return {
+                success: false,
+                status: 'ADMIN_KEY_REQUIRED',
+                message: createKeyError(),
+                code: 401
             }
-        });
+
+            if (process.env.BASE_KEY && process.env.BASE_KEY !== doc.key) return {
+                success: false,
+                status: 'INVALID_API_KEY',
+                message: createKeyError(),
+                code: 401
+            }
+        }
+
+        else if (key.startsWith('CordXAdmin ')) {
+
+            const doc = await this.model.findOne({ key: key.replace('CordXAdmin ', '') });
+
+            if (!doc) return {
+                success: false,
+                status: 'KEY_NOT_FOUND',
+                message: createKeyError(),
+                code: 404
+            }
+
+            if (requires == 'BASIC') return {
+                success: true,
+                status: 'ADMIN_KEY_BYPASS',
+                code: 200
+            }
+        }
+
+        return {
+            success: true,
+            status: 'KEY_IS_VALID',
+            code: 200
+        }
     }
 
     public async random(admin: boolean): Promise<Typings.Responses> {

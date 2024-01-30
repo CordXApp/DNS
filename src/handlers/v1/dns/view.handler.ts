@@ -1,56 +1,55 @@
-import { Database } from '../../../clients/database/db.client';
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { InstanceClient } from '../../../clients/instances/instance.client';
+import { createTeaPotError } from '../../../res/errors';
+import { Request } from '../../../types/fastify.types';
 
-const Handler = async (req: FastifyRequest<{ Body: { domain: string } }>, res: FastifyReply) => {
+const Handler = async (req: FastifyRequest<Request>, res: FastifyReply) => {
     res.header('Content-Type', 'application/json');
 
-    const domain = req.body.domain;
-
-    //@ts-ignore
-    const data = await req?.db?.getDomain(domain);
+    const db = req.db;
+    const domain = req.query.domain;
+    const data = await db.dns.fetch(domain);
 
     if (!data.success) return res.status(400).send({
-        message: 'Failed to get domain.',
-        error: data.message,
+        status: 'DOMAIN_NOT_FOUND',
+        message: 'The domain you are looking for does not exist.',
         code: 400
     })
 
-    const domainDocument = data.domain;
-
-    if (!domainDocument) return res.status(404).send({
-        message: 'Domain not found.',
-        code: 404
-    })
-
     return res.status(200).send({
-        name: domainDocument.name,
-        txtContent: domainDocument.txtContent,
-        verified: domainDocument.verified,
+        name: data?.domain?.name,
+        txtContent: data?.domain?.txtContent,
+        verified: data?.domain?.verified,
     })
 };
 
-const PreHandler = async (req: FastifyRequest<{ Body: { domain: string }, Headers: { Authorization: string, } }>, res: FastifyReply) => {
+const PreHandler = async (req: FastifyRequest<Request>, res: FastifyReply) => {
+    res.header('Content-Type', 'application/json');
+
     const db = req.db;
     const auth = req.headers['authorization'];
-    const key = await db.keys.validate(auth.replace('Bearer ', ''))
-    const dom = await req.body.domain;
+    const domain = req.query.domain;
 
-    if (!dom || !req.body) return res.status(400).send({
-        message: 'No domain provided.',
+    console.log(domain)
+
+    if (!req.params || !domain) return res.status(400).send({
+        status: 'INVALID_REQ_PARAMS',
+        message: createTeaPotError(),
         code: 400
     });
 
     if (!auth) return res.status(401).send({
-        message: 'No authorization header provided.',
+        status: 'MISSING_AUTHORIZATION_HEADER',
+        message: createTeaPotError(),
         code: 401
-    })
+    });
 
-    if (!key.success) return res.status(400).send({
-        message: 'Invalid authorization header.',
-        error: key.message,
-        code: 400
-    })
+    const check = await db.keys.validate(auth, 'BASIC');
+
+    if (!check.success) return res.status(check.code as number).send({
+        status: check.status,
+        message: check.message,
+        code: check.code
+    });
 };
 
 export const View = { PreHandler, Handler };

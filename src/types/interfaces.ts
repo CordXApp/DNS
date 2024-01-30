@@ -37,6 +37,7 @@ export interface RouteSchema {
 export interface DNSResponses {
     validate: DNS_Validate;
     verify: DNS_Verify;
+    fetch: DNS_ViewDomain;
 }
 
 export interface DNS_Validate {
@@ -50,4 +51,14 @@ export interface DNS_Validate {
 export interface DNS_Verify {
     success: boolean;
     message: string;
+}
+
+export interface DNS_ViewDomain {
+    success: boolean;
+    message?: string;
+    domain?: {
+        name: string;
+        txtContent: string;
+        verified: boolean;
+    }
 }

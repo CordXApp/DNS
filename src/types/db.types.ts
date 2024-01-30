@@ -28,3 +28,7 @@ export interface Key {
 export interface Client {
     instance: IInstance;
 }
+
+export interface KeyType {
+    level: 'ADMIN' | 'BASIC'
+}

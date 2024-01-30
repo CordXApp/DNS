@@ -1,17 +1,16 @@
 import { CordXSnowflake } from "./snowflake.client";
 import { InstanceErrors } from "../../types/err.types";
-import { IInstance, IInstanceClient } from "../../types/instance";
-import { Logger } from "../other/log.client";
 import { CordXError } from "../other/error.client";
-import { Keys } from "../database/key.client";
+import { IInstance } from "../../types/instance";
+import { Logger } from "../other/log.client";
 
 export class InstanceClient implements IInstance {
     public static instances: Map<string, IInstance> = new Map();
     private static errors: typeof InstanceErrors = InstanceErrors;
     private static snowflake: CordXSnowflake = new CordXSnowflake();
     private static logger: Logger = Logger.getInstance('INSTANCE:Manager', false)
-    private static idleTimeoutDuration: number = 1000 * 60 * 20;
-    private static warningInterval: number = 1000 * 60 * 5;
+    private static idleTimeoutDuration: number = 1000 * 60 * 60;
+    private static warningInterval: number = 1000 * 60 * 15;
     public static version: string = 'v0.0.1-beta'
     public static state: 'HEALTHY' | 'UNHEALTHY';
 
@@ -155,6 +154,9 @@ export class InstanceClient implements IInstance {
 
             if (operation == 'connect') {
                 if (this.properties.hasOwnProperty('connect')) {
+
+                    this.setState('BUSY');
+
                     this.properties.connect().then(() => {
                         this.lastUsed = new Date();
                         this.setState('HEALTHY');

@@ -17,14 +17,15 @@ export const ViewDomainSchema: RouteSchema = {
         400: {
             type: 'object',
             properties: {
+                status: { type: 'string' },
                 message: { type: 'string' },
-                error: { type: 'string' },
                 code: { type: 'number' },
             }
         },
         401: {
             type: 'object',
             properties: {
+                status: { type: 'string' },
                 message: { type: 'string' },
                 code: { type: 'number' },
             }
