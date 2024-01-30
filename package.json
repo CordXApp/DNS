@@ -1,6 +1,6 @@
 {
   "name": "@cordxapp/dns",
-  "version": "1.0.0",
+  "version": "0.0.1-beta",
   "description": "Simple API for handling our DNS related services.",
   "main": "src/server.ts",
   "private": true,
