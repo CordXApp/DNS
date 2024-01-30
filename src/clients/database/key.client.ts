@@ -11,12 +11,14 @@ export class Keys {
     private static client: Keys;
     public instance: IInstance;
     public model = KeyModel;
-    public static version: string = 'v0.0.1-beta';
+    public static version: string = '0.0.1-beta';
     private static errors: typeof KeyErrors = KeyErrors;
 
     constructor() {
 
         Keys.client = this
+        Keys.cleanup()
+        Keys.init()
 
         const instance = InstanceClient.get('CordX:KeyManager', {
             model: this.model,
@@ -28,8 +30,6 @@ export class Keys {
         })
 
         this.instance = instance;
-
-        Keys.cleanup()
     }
 
     public static health(): string {
@@ -38,6 +38,64 @@ export class Keys {
         if (!instance.success) return 'UNHEALTHY'
 
         return 'HEALTHY'
+    }
+
+    /**
+     * @function init
+     * @description Initialize the key client and validate the env file.
+     */
+    public static async init(): Promise<void> {
+        const baseCheck = await this.client.model.countDocuments({ admin: false });
+        const adminCheck = await this.client.model.countDocuments({ admin: true });
+
+        if (!baseCheck) {
+            await this.client.instance.logs?.warn(`No base level api keys found, creating one now...`);
+            await this.client.create(false).then(async (key) => {
+                this.client.instance.logs?.success(`Successfully created a new base level api key in our database.`);
+                this.client.instance.logs?.success(`Please add this to your ".env" file: "BASE_KEY=${key.key}"`);
+            }).catch((err: Error) => {
+                this.client.instance.logs?.fatal(`Error creating api key: ${err.stack}`);
+                return process.exit(1)
+            })
+        } else if (!adminCheck) {
+            await this.client.instance.logs?.warn(`No admin level api keys found, creating one now...`);
+            await this.client.create(true).then(async (key) => {
+                this.client.instance.logs?.success(`Successfully created a new base level api key in our database.`);
+                this.client.instance.logs?.success(`Please add this to your ".env" file: "ADMIN_KEY=${key.key}"`);
+            }).catch((err: Error) => {
+                this.client.instance.logs?.fatal(`Error creating api key: ${err.stack}`);
+                return process.exit(1);
+            })
+        } else {
+            this.client.instance.logs?.success('Successfully validated/created necessary api keys');
+            this.client.instance.logs?.info(`Environment variables will now be checked/validated`);
+        }
+
+        const env = process.env;
+        const base = await this.client.model.findOne({ admin: false });
+
+        if (!env) {
+            this.client.instance.logs?.error(`Env validation failed: please make sure you have a ".env" file in your root directory`);
+            return process.exit(1);
+        } else if (env.ADMIN_KEY) {
+            this.client.instance.logs?.fatal(`Env validation failed: please remove the "ADMIN_KEY" variable from your ".env" file, admin keys are handled internally.`);
+            return process.exit(1);
+        } else if (!env.BASE_KEY) {
+            this.client.instance.logs?.fatal(`Env validation failed: please make sure you have a "BASE_KEY" variable with a valid CordX API KEY`);
+            this.client.instance.logs?.info(`If you need an api key you can add this one to your ".env" file: "BASE_KEY=${base.key}"`);
+            return process.exit(1);
+        } else if (env.BASE_KEY) {
+            if (env.BASE_KEY !== base.key) {
+                this.client.instance.logs?.fatal(`Env validation failed: please make sure you have a "BASE_KEY" variable with a valid CordX API KEY`)
+                this.client.instance.logs?.info(`If you need an api key you can add this one to your ".env" file: "BASE_KEY=${base.key}"`);
+                return process.exit(1);
+            } else if (!await this.client.model.findOne({ key: env.BASE_KEY })) {
+                this.client.instance.logs?.fatal(`Env validation failed: please make sure you have a "BASE_KEY" variable with a valid CordX API KEY`)
+                this.client.instance.logs?.info(`If you need an api key you can add this one to your ".env" file: "BASE_KEY=${base.key}"`);
+            }
+        }
+
+        this.client.instance.logs?.success('Env validation completed successfully!');
     }
 
     /**

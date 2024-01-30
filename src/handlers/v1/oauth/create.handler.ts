@@ -15,7 +15,7 @@ const PreHandler = async (req: FastifyRequest<{ Headers: { Authorization: string
     res.header('Content-Type', 'application/json');
 
     const auth = req.headers['authorization'];
-    const validate = await req.db.keys.validate(auth.replace('CordXAdmin ', ''));
+    const validate = await req.db.keys.validate(auth);
 
     if (!validate.success) return res.status(validate.code as number).send({
         message: validate.message,

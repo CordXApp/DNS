@@ -18,7 +18,7 @@ export class Database implements DBTypes.Client {
     public keys: Keys = new Keys()
     public instance: IInstance;
 
-    public static version: string = 'v0.0.1-beta';
+    public static version: string = '0.0.1-beta';
 
     constructor() {
 

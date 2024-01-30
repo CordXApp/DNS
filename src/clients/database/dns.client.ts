@@ -11,7 +11,7 @@ export class DNSClient {
 
     public instance: IInstance;
     private static logs: Logger;
-    public static version: string = 'v0.0.1-beta';
+    public static version: string = '0.0.1-beta';
     private model: typeof UserModel = UserModel;
 
     constructor() {
@@ -225,7 +225,7 @@ export class DNSClient {
         })
     }
 
-    public async domain(domain: string): { success: boolean, message: string, data?: any } {
+    public async domain(domain: string): Promise<{ success: boolean, message?: string, data?: any }> {
         const validate = await this.validate(domain);
 
         if (!validate.success) return {
@@ -236,7 +236,8 @@ export class DNSClient {
         const dom = await this.model.findOne({})
 
         return {
-
+            success: true,
+            data: dom
         }
     }
 }
