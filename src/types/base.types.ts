@@ -1,3 +1,5 @@
+import { Document } from 'mongoose';
+
 export interface User extends Document {
     id: number;
     owner: boolean;
@@ -32,33 +34,4 @@ export interface RouteSchema {
     querystring?: any;
     body?: any;
     tags: string[];
-}
-
-export interface DNSResponses {
-    validate: DNS_Validate;
-    verify: DNS_Verify;
-    fetch: DNS_ViewDomain;
-}
-
-export interface DNS_Validate {
-    success: boolean;
-    message: string;
-    expected?: string;
-    received?: string;
-    explanation?: string;
-}
-
-export interface DNS_Verify {
-    success: boolean;
-    message: string;
-}
-
-export interface DNS_ViewDomain {
-    success: boolean;
-    message?: string;
-    domain?: {
-        name: string;
-        txtContent: string;
-        verified: boolean;
-    }
 }

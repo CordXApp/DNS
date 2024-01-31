@@ -1,7 +1,8 @@
 import { DatabaseErrors } from '../../types/err.types';
 import { InstanceClient } from '../instances/instance.client';
-import { IInstance } from '../../types/instance';
-import * as DBTypes from '../../types/db.types';
+import { IInstance } from '../../types/clients/instance.types';
+import * as DBTypes from '../../types/clients/db.types';
+import { Properties } from '../../types/clients/db.types';
 import { Logger } from '../other/log.client';
 import { CordXError } from '../other/error.client';
 import { DNSClient } from './dns.client';
@@ -14,31 +15,24 @@ export class Database implements DBTypes.Client {
     private static logger: Logger = Logger.getInstance('CordX:Database', false);
     private static connection: Connection = mongo.connection;
     private static uri: string = process.env.MONGO_URI as string;
+    public instance: IInstance<DBTypes.Properties>;
     public dns: DNSClient = new DNSClient()
     public keys: Keys = new Keys()
-    public instance: IInstance;
 
     public static version: string = '0.0.1-beta';
 
     constructor() {
 
         this.instance = InstanceClient.get('CordX:Database', {
-            class: Database,
             mongoose: mongo,
-            connection: Database.connection,
-            connect: this.connect,
-            keys: this.keys,
-            dns: this.dns
-        })
+            connect: this.connect.bind(this),
+            disconnect: this.disconnect.bind(this)
+        }) as unknown as IInstance<Properties>;
 
         Database.connection = mongo.connection;
 
         this.connect().catch((err: Error) => {
-            Database.logger.error(Database.errors['DATABASE_CONNECTION_FAILED']({
-                message: `Database failed to connect to: ${Database.uri.replace(/\/\/.*@.*\//, '//<credentials>@<ip>/')}`,
-                status: 'DATABASE_CONNECTION_FAILED',
-                stack: err.stack
-            }));
+            Database.logger.error(`Failed to connect to database: ${err.stack}`)
         })
 
         this.init();
@@ -51,14 +45,14 @@ export class Database implements DBTypes.Client {
      * @memberof Database
      * @instance IInstance
      */
-    public async connect(): Promise<void> {
+    private async connect(): Promise<void> {
         if (Database.connection.readyState === 1) {
             return;
         }
 
         try {
             await this.instance.properties.mongoose.connect(Database.uri);
-            this.instance.setLastUsed();
+            this.instance.setLastUsed()
             this.instance.setState('HEALTHY');
             Database.logger.info(`Connected to database: ${Database.maskUri(Database.uri)}`);
             Database.logger.info(`Database Instance ID: ${this.instance.id}`);
@@ -121,5 +115,27 @@ export class Database implements DBTypes.Client {
      */
     private static maskUri(uri: string): string {
         return uri.replace(/\/\/.*?@.*?:/, '//<credentials>@<ip>:');
+    }
+
+    private disconnect(): void {
+        if (Database.connection.readyState === 0) {
+            return;
+        }
+
+        Database.connection.close();
+
+        Database.logger.info(`Disconnected from MongoDB at ${Database.maskUri(Database.uri)}`);
+    }
+
+    public cleanup(): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+            this.instance.properties.mongoose.connection.close().then(() => {
+                this.instance.logs?.success(`Successfully cleaned up database instance.`);
+                resolve(true)
+            }).catch((err: Error) => {
+                this.instance.logs?.fatal(`Failed to cleanup database instance.`)
+                reject(err.stack)
+            })
+        })
     }
 }

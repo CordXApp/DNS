@@ -1,4 +1,4 @@
-import { Router } from '../../types/interfaces';
+import { Router } from '../../types/base.types';
 import { baseHandlers } from '../../handlers/base.handler';
 
 const base: Router = {

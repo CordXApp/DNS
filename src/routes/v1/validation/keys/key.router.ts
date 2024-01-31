@@ -1,6 +1,6 @@
 import { CreateKeySchema } from '../../../../docs/v1/auth/create.docs';
 import { V1Handlers } from '../../../../handlers/base.handler';
-import { Router } from '../../../../types/interfaces';
+import { Router } from '../../../../types/base.types';
 
 export const validateAPIKey: Router = {
     url: '/v1/validate/key',

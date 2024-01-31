@@ -1,4 +1,4 @@
-import { RouteSchema } from "../../types/interfaces"
+import { RouteSchema } from "../../types/base.types"
 
 export const HomeSchema: RouteSchema = {
     tags: [],

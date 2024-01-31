@@ -1,18 +1,21 @@
-import { Database } from "./db.client";
 import { KeyErrors } from "../../types/err.types";
 import { KeyModel } from "../../schemas/keys.schema";
 import { InstanceClient } from "../instances/instance.client";
-import * as Typings from '../../types/db.types';
-import { IInstance } from "../../types/instance";
+import * as KeyTypes from '../../types/clients/key.types';
+import * as InstanceTypes from '../../types/clients/instance.types';
 import { createKeyError } from "../../res/errors";
 import crypto from 'crypto';
 
-export class Keys {
+export class Keys implements KeyTypes.Client {
+
+    /** CLASS LEVEL PROPERTIES */
     private static client: Keys;
-    public instance: IInstance;
-    public model = KeyModel;
     public static version: string = '0.0.1-beta';
     private static errors: typeof KeyErrors = KeyErrors;
+
+    /** INSTANCE LEVEL PROPERTIES */
+    private model = KeyModel;
+    public instance: InstanceTypes.IInstance<KeyTypes.Properties>;
 
     constructor() {
 
@@ -20,16 +23,14 @@ export class Keys {
         Keys.cleanup()
         Keys.init()
 
-        const instance = InstanceClient.get('CordX:KeyManager', {
+        this.instance = InstanceClient.get('CordX:KeyManager', {
             model: this.model,
-            errors: Keys.errors,
-            version: Keys.version,
-            create: this.create,
-            random: this.random,
-            validate: this.validate
-        })
-
-        this.instance = instance;
+            get: this.get.bind(this),
+            create: this.create.bind(this),
+            delete: this.delete.bind(this),
+            random: this.random.bind(this),
+            validate: this.validate.bind(this),
+        }) as unknown as InstanceTypes.IInstance<KeyTypes.Properties>;
     }
 
     public static health(): string {
@@ -134,7 +135,15 @@ export class Keys {
         }
     }
 
-    public async create(admin: boolean): Promise<Typings.Responses> {
+    /**
+     * @function create
+     * @description Create a new api key.
+     * @param {boolean} admin Whether or not the key should be an admin key.
+     * @returns {Promise<KeyTypes.Responses['create']>}
+     * @private This function is private to the instance of the class.
+     * @memberof Keys
+     */
+    private async create(admin: boolean): Promise<KeyTypes.Responses['create']> {
         const exists = InstanceClient.exists('CordX:Database');
 
         if (!exists.success) return {
@@ -156,7 +165,7 @@ export class Keys {
         }
     }
 
-    public async delete(key: string): Promise<Typings.Responses> {
+    private async delete(key: string): Promise<KeyTypes.Responses['delete']> {
         const exists = InstanceClient.exists('Database');
 
         if (!exists.success) return {
@@ -179,7 +188,7 @@ export class Keys {
         }
     }
 
-    public async get(key: string): Promise<Typings.Responses> {
+    private async get(key: string): Promise<KeyTypes.Responses['get']> {
         const exists = InstanceClient.exists('Database');
 
         if (!exists.success) return {
@@ -209,7 +218,7 @@ export class Keys {
      * @returns {Promise<Typings.Responses>}
      * @memberof Keys
      */
-    public async validate(key: string, requires: Typings.KeyType['level']): Promise<Typings.Responses> {
+    private async validate(key: string, requires: KeyTypes.Perms['level']): Promise<KeyTypes.Responses['validate']> {
 
         if (key.startsWith('Bearer ')) {
 
@@ -262,7 +271,7 @@ export class Keys {
         }
     }
 
-    public async random(admin: boolean): Promise<Typings.Responses> {
+    private async random(admin: boolean): Promise<KeyTypes.Responses['random']> {
         let key;
 
         if (admin) key = this.model.findOne({ admin: true })

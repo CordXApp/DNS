@@ -1,13 +1,14 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { createTeaPotError } from '../../../res/errors';
 import { Request } from '../../../types/fastify.types';
+import { Responses } from '../../../types/clients/key.types';
 
 const Handler = async (req: FastifyRequest<Request>, res: FastifyReply) => {
     res.header('Content-Type', 'application/json');
 
     const db = req.db;
     const domain = req.query.domain;
-    const data = await db.dns.fetch(domain);
+    const data = await db.dns.fetch(domain ? domain : '');
 
     if (!data.success) return res.status(400).send({
         status: 'DOMAIN_NOT_FOUND',
@@ -43,7 +44,8 @@ const PreHandler = async (req: FastifyRequest<Request>, res: FastifyReply) => {
         code: 401
     });
 
-    const check = await db.keys.validate(auth, 'BASIC');
+    const responses: Responses = await db.keys.instance.properties.validate(auth, 'BASIC');
+    const check = responses.validate
 
     if (!check.success) return res.status(check.code as number).send({
         status: check.status,

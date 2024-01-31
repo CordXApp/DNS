@@ -11,7 +11,8 @@ export interface CordXResponse extends OriginalFastifyReply {
 export type CordXResponseType = new (reply: OriginalFastifyReply) => CordXResponse;
 
 export interface Query {
-    domain: string;
+    domain?: string;
+    user?: string;
 }
 
 export interface Params {

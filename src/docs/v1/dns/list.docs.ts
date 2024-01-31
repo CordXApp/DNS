@@ -1,17 +1,17 @@
 import { RouteSchema } from "../../../types/base.types"
 
-export const CreateKeySchema: RouteSchema = {
-    tags: ['Auth'],
-    summary: 'Create a new hash key',
-    description: 'Create a new hash key and register it in our database for authentication purposes.',
+export const ListDomainsSchema: RouteSchema = {
+    tags: ['DNS'],
+    summary: 'List all of a user\'s domains',
+    description: 'List all of the domains that a user has registered with us.',
     security: [{ Bearer: [] }],
     response: {
         200: {
             type: 'object',
             properties: {
-                message: { type: 'string' },
-                code: { type: 'number' },
-                key: { type: 'string' },
+                name: { type: 'string' },
+                txtContent: { type: 'string' },
+                verified: { type: 'boolean' },
             }
         },
         400: {
@@ -30,15 +30,7 @@ export const CreateKeySchema: RouteSchema = {
                 code: { type: 'number' },
             }
         },
-        418: {
-            type: 'object',
-            properties: {
-                tea: { type: 'string' },
-                message: { type: 'string' },
-                code: { type: 'number' },
-            }
-        },
-        423: {
+        404: {
             type: 'object',
             properties: {
                 status: { type: 'string' },

@@ -1,30 +1,32 @@
 import dns from 'node:dns';
 import net from 'node:net';
 import { Logger } from '../other/log.client';
-import { KEYWORDS, BLACKLIST } from '../../types/keywords';
 import { UserModel } from '../../schemas/user.schema';
-import { DNSResponses } from '../../types/interfaces';
-import { IInstance } from '../../types/instance';
+import * as DNSTypes from '../../types/clients/dns.types';
+import { KEYWORDS, BLACKLIST } from '../../types/keyword.types';
+import * as InstanceTypes from '../../types/clients/instance.types';
 import { InstanceClient } from '../instances/instance.client';
 
-export class DNSClient {
+export class DNSClient implements DNSTypes.Client {
 
-    public instance: IInstance;
+    /** CLASS LEVEL PROPERTIES */
     private static logs: Logger;
     public static version: string = '0.0.1-beta';
-    private model: typeof UserModel = UserModel;
+
+    /** INSTANCE LEVEL PROPERTIES */
+    public model = UserModel;
+    public instance: InstanceTypes.IInstance<DNSTypes.Properties>;
 
     constructor() {
         this.instance = InstanceClient.get('CordX:DNS', {
-            class: DNSClient,
-            keywords: KEYWORDS,
-            check: this.check,
-            blacklisted: this.blacklisted,
-            resolve: this.resolve,
-            validate: this.validate,
-            verified: this.verified,
+            fetch: this.fetch.bind(this),
+            check: this.check.bind(this),
+            blacklisted: this.blacklisted.bind(this),
+            resolve: this.resolve.bind(this),
+            validate: this.validate.bind(this),
+            verified: this.verified.bind(this),
             model: this.model
-        })
+        }) as unknown as InstanceTypes.IInstance<DNSTypes.Properties>;
     }
 
     /**
@@ -147,7 +149,7 @@ export class DNSClient {
      * @tutorial `await DNSClient.validate('google.com')`
      * @typedef {object} DNS_Validate
      */
-    public validate(domain: string): Promise<DNSResponses['validate']> {
+    private validate(domain: string): Promise<DNSTypes.Responses['validate']> {
         return new Promise((resolve, reject) => {
             if (typeof domain !== 'string') {
                 DNSClient.logs.error(`Failed to validate domain ${domain}: Domain must be a string.`);
@@ -206,7 +208,7 @@ export class DNSClient {
      * @returns A promise that resolves to a DNS_Verify object.
      * @tutorial `await DNSClient.verified('google.com')`
      */
-    public verified(domain: string): Promise<DNSResponses['verify']> {
+    public verified(domain: string): Promise<DNSTypes.Responses['verify']> {
         return new Promise(async (resolve, reject) => {
             const dom = await UserModel.findOne({ 'domains.name': domain });
             const doc = await dom.domains.find((d: any) => d.name === domain);
@@ -234,7 +236,7 @@ export class DNSClient {
         })
     }
 
-    public async fetch(domain: string): Promise<DNSResponses['fetch']> {
+    public async fetch(domain: string): Promise<DNSTypes.Responses['fetch']> {
         const dom = await this.model.findOne({ 'domains.name': domain });
 
         if (!dom) return {

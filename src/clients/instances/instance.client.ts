@@ -1,11 +1,13 @@
 import { CordXSnowflake } from "./snowflake.client";
 import { InstanceErrors } from "../../types/err.types";
 import { CordXError } from "../other/error.client";
-import { IInstance } from "../../types/instance";
+import { IInstance, InstanceProperties } from "../../types/clients/instance.types";
+import { Properties } from "../../types/clients/key.types";
+import * as DNSTypes from "../../types/clients/dns.types";
 import { Logger } from "../other/log.client";
 
-export class InstanceClient implements IInstance {
-    public static instances: Map<string, IInstance> = new Map();
+export class InstanceClient implements IInstance<InstanceProperties> {
+    public static instances: Map<string, IInstance<InstanceProperties>> = new Map();
     private static errors: typeof InstanceErrors = InstanceErrors;
     private static snowflake: CordXSnowflake = new CordXSnowflake();
     private static logger: Logger = Logger.getInstance('INSTANCE:Manager', false)
@@ -21,7 +23,7 @@ export class InstanceClient implements IInstance {
     public idleTimeout: NodeJS.Timeout | null;
     public idleStart: number | null;
     public state: 'HEALTHY' | 'UNHEALTHY' | 'BUSY' | 'IDLE' | 'DESTROYED' | 'CLEANSING' | 'CLEANSED';
-    public properties: any;
+    public properties: IInstance<InstanceProperties>;
     public logs: Logger | null = null;
 
     private constructor(id: string, name: string, properties: any) {
@@ -52,9 +54,9 @@ export class InstanceClient implements IInstance {
      * @memberof InstanceClient
      */
 
-    public static healthy(): IInstance[] {
+    public static healthy(): IInstance<InstanceProperties>[] {
         const data = this.instances.values();
-        return Array.from(data).filter((instance: IInstance) => {
+        return Array.from(data).filter((instance: IInstance<InstanceProperties>) => {
             return ['HEALTHY', 'IDLE', 'BUSY'].includes(instance.state)
         })
     }
@@ -65,8 +67,8 @@ export class InstanceClient implements IInstance {
      * @returns {IInstance[]}
      * @memberof InstanceClient
      */
-    public static unhealthy(): IInstance[] {
-        return Array.from(this.instances.values()).filter((instance: IInstance) => {
+    public static unhealthy(): IInstance<InstanceProperties>[] {
+        return Array.from(this.instances.values()).filter((instance: IInstance<InstanceProperties>) => {
             return ['UNHEALTHY', 'DESTROYED', 'CLEANSING', 'CLEANSED'].includes(instance.state) || null;
         });
     }
@@ -92,7 +94,7 @@ export class InstanceClient implements IInstance {
      * @param {any} properties the properties of the instance.
      * @returns {Promise<IInstance>}
      */
-    public static create(name: string, properties: any): IInstance {
+    public static create(name: string, properties: any): IInstance<InstanceProperties> {
         const id = InstanceClient.snowflake.generate();
         const instance = new InstanceClient(id, name, properties);
         this.instances.set(name, instance);
@@ -109,7 +111,7 @@ export class InstanceClient implements IInstance {
      * @returns {Promise<IInstance>}
      * @memberof InstanceClient
      */
-    public static get(name: string, properties: any): IInstance {
+    public static get(name: string, properties: any): IInstance<InstanceProperties> {
         InstanceClient.logger.info(`Getting instance with name ${name}`);
         let client = InstanceClient.instances.get(name);
 
@@ -134,49 +136,12 @@ export class InstanceClient implements IInstance {
      */
     public execute(operation: string): Promise<void> {
         return new Promise((resolve, reject) => {
-            if (!this) return reject(InstanceClient.errors['INSTANCE_NOT_FOUND']({
-                message: `Hmm, something is seriously wrong. We couldn't find that instance.`
-            }))
+            let client = InstanceClient.instances.get(this.name);
 
-            if (this.state !== 'HEALTHY' && this.state !== 'IDLE') return reject(InstanceClient.errors['UNHEALTHY_EXECUTION']({
-                message: `Woah, you can't execute operations on an unhealthy instance.`,
-                state: 'The current state of this instance is: ' + this.state,
-                fix: 'Please wait for the instance to become healthy or clean it up and make a new one.'
-            }));
+            if (!client) return reject(InstanceClient.logger.error(`Instance not found`));
+            if (client.state !== 'HEALTHY' && client.state !== 'IDLE') return reject(InstanceClient.logger.error(`Instance is not healthy`));
 
-            if (!this.properties.connected) {
-                this.setState('UNHEALTHY');
-                return reject(InstanceClient.errors['INSTANCE_CONNECTION_FAILED']({
-                    message: `Failed to execute operation on instance: ${this.name}(${this.id})`,
-                    reason: 'The connection should be established before executing operations on the instance.',
-                }));
-            }
 
-            if (operation == 'connect') {
-                if (this.properties.hasOwnProperty('connect')) {
-
-                    this.setState('BUSY');
-
-                    this.properties.connect().then(() => {
-                        this.lastUsed = new Date();
-                        this.setState('HEALTHY');
-                        this.properties.connected = true;
-                        resolve(this.logs?.trace(InstanceClient.errors['INSTANCE_CONNECTION_SUCCESS']({
-                            message: `Successfully established a connection.`,
-                            instance: this.name + '(' + this.id + ')',
-                            database: this.name || 'MongoDB'
-                        })));
-                    }).catch((err: Error) => {
-                        this.setState('UNHEALTHY');
-                        return reject(this.logs?.fatal(InstanceClient.errors['INSTANCE_CONNECTION_FAILED']({
-                            message: `Failed to establish a connection.`,
-                            instance: this.name + '(' + this.id + ')',
-                            database: this.name || 'MongoDB',
-                            stack: err.stack
-                        })));
-                    })
-                }
-            }
         })
     }
 
@@ -198,25 +163,14 @@ export class InstanceClient implements IInstance {
      */
     public cleanup(): Promise<boolean> {
         return new Promise((resolve, reject) => {
-            const client = InstanceClient.instances.get(this.name);
-
             if (!this) return reject(InstanceClient.errors['INSTANCE_NOT_FOUND']({
                 message: `Unable to locate that instance.`,
             }));
 
-            this.state = 'CLEANSING';
+            this.setState('CLEANSING');
 
-            if (this.properties && this.properties.hasOwnProperty('connection')) {
-                this.properties.connection.close().then(() => {
-                    InstanceClient.logger.info(`Database connection closed for instance: ${this.name}(${this.id})`);
-                    this.properties = null;
-                }).catch((err: Error) => {
-                    this.state = 'UNHEALTHY'
-                    return reject(InstanceClient.logger.fatal(InstanceClient.errors['INSTANCE_CLEANUP_FAILED']({
-                        message: `Failed to close database connection for instance: ${this.name}(${this.id})`,
-                        stack: err.stack
-                    })))
-                })
+            if (this.properties && this.properties.hasOwnProperty('connect')) {
+                this.properties.cleanup()
             }
 
             if (this.idleTimeout) {
@@ -279,7 +233,7 @@ export class InstanceClient implements IInstance {
      * @memberof InstanceClient
      * @returns {Promise<IInstance>}
      */
-    public static async cleanse(): Promise<Partial<IInstance>[] | CordXError> {
+    public static async cleanse(): Promise<Partial<IInstance<InstanceProperties>>[] | CordXError> {
         return new Promise((resolve, reject) => {
             const array = Array.from(this.instances.values());
 
@@ -288,7 +242,7 @@ export class InstanceClient implements IInstance {
             }));
 
             const keysToRemove: string[] = [];
-            const cleanedUp: Partial<IInstance>[] = [];
+            const cleanedUp: Partial<IInstance<InstanceProperties>>[] = [];
             const errors: any[] = [];
 
             for (const [key, client] of this.instances.entries()) {
@@ -422,7 +376,7 @@ export class InstanceClient implements IInstance {
      * @memberof InstanceClient
      * @throws {CordXError} if the state is invalid.
      */
-    public setState(state: IInstance['state']): void | string {
+    public setState(state: IInstance<InstanceProperties>['state']): void | string {
         if (!this) return;
 
         const valid = ['HEALTHY', 'UNHEALTHY', 'BUSY', 'IDLE', 'DESTROYED', 'CLEANSING', 'CLEANSED']
@@ -453,7 +407,7 @@ export class InstanceClient implements IInstance {
      * const info = instance.info;
      * console.log(info);
      */
-    public view(): Partial<IInstance> {
+    public view(): Partial<IInstance<InstanceProperties>> {
 
         if (!this) InstanceClient.logger.fatal(InstanceClient.errors['INSTANCE_NOT_FOUND']({
             message: `Hmm, something went wrong. We couldn't find that instance.`,
