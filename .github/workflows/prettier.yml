@@ -13,5 +13,5 @@ jobs:
             - name: Prettier CI
               uses: creyD/prettier_action@v4.3
               with:
-                  prettier_options: --write **/*.{js,jsx,ts,tsx}
+                  prettier_options: --write src/**/*.{js,jsx,ts,tsx}
                   commit_message: "🍧 chore(ci): Prettify the code!"
