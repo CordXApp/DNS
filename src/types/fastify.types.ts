@@ -15,14 +15,15 @@ export interface Query {
     user?: string;
 }
 
-export interface Params {
-    domain: string;
+export interface Request {
+    Querystring?: Query;
+    Params?: Params;
+    Headers?: {
+        Authorization?: string;
+    }
 }
 
-export interface Request {
-    Querystring: Query;
-    Params: Params;
-    Headers: {
-        Authorization: string;
-    }
+export interface Params {
+    domain?: string;
+    secret?: string;
 }
