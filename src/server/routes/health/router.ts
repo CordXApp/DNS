@@ -1,4 +1,5 @@
 import { BaseHandler } from '../../handlers/base/handler';
+import { BaseDocs } from '../../swagger/base/health.docs';
 import { FastifyInstance } from 'fastify';
 
 export default async function (app: FastifyInstance) {
@@ -8,6 +9,7 @@ export default async function (app: FastifyInstance) {
     app.route({
         method: 'GET',
         url: '/',
-        handler: health.handler
+        handler: health.handler,
+        schema: BaseDocs.ServerHealth
     })
 }

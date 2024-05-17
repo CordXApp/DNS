@@ -12,13 +12,36 @@ import {
     BLACKLISTED_KEYWORDS
 } from "../types/clients/db.types";
 
+const prisma = new PrismaClient();
+
 export class Database implements DBClient {
     private logs: Logger;
     private prisma: PrismaClient;
 
     constructor() {
         this.logs = new Logger('[DNS:Prisma]', false);
-        this.prisma = new PrismaClient();
+        this.prisma = prisma;
+    }
+
+    public get user() {
+        return {
+            exists: async (id: string): Promise<Boolean> => {
+
+                const user = await this.prisma.users.findUnique({ where: { userid: id } });
+
+                if (!user) return false;
+
+                return true;
+            },
+            fetch: async (id: string): Promise<ResponseLayout> => {
+
+                const user = await this.prisma.users.findUnique({ where: { userid: id } })
+
+                if (!user) return { success: false, message: 'Unable to locate that user in our database.' };
+
+                return { success: true, message: 'User found', data: user }
+            }
+        }
     }
 
     public get domain() {
@@ -63,38 +86,60 @@ export class Database implements DBClient {
 
                 return dom ? true : false;
             },
+            setActive: async (params: Parameters): Promise<ResponseLayout> => {
+                const user = await this.prisma.users.findUnique({ where: { userid: params.owner } });
+                const valid = await this.domain.validate({ domain: params.domain });
+
+                if (!user) return { success: false, message: 'Unable to locate the provided user!' };
+
+                if (!valid.success) return { success: false, message: valid.message };
+
+                if (user.domain === params.domain) return { success: true, message: 'This domain is already active!' };
+
+                const update = await this.prisma.users.update({
+                    where: { userid: params.owner },
+                    data: { domain: params.domain }
+                })
+
+                if (!update) return { success: false, message: 'Failed to update domain, if this issue persist please report it!' };
+
+                return { success: true, message: 'Active domain updated successfully!' };
+            },
             blacklisted: async (params: Parameters): Promise<boolean> => {
-                const isBlacklisted = params.config?.blacklist.some((word) => params.domain.includes(word));
+                const isBlacklisted = params.config?.blacklist.some((word) => params.domain?.includes(word));
 
                 return isBlacklisted ? true : false;
             },
             removeSubdomain: (params: Parameters): string => {
-                const parts = params.domain.split('.');
-                const root = parts.slice(-2).join('.');
+                const parts = params.domain?.split('.');
+                const root = parts!.slice(-2).join('.');
 
                 return root;
             },
             validate: async (params: Parameters): Promise<ResponseLayout> => {
-                const isNotIP = net.isIP(params.domain) != 0;
+                const isNotIP = net.isIP(params.domain!) != 0;
 
                 if (isNotIP) return { success: false, message: 'Please provide a domain name (IP Addresses are not yet supported)' };
 
                 const pattern = new RegExp('^(?!-)[A-Za-z0-9-]{1,63}(?<!-)$');
 
-                const parts = params.domain.split('.');
+                const parts = params.domain?.split('.');
 
-                if (parts.length < 2) return { success: false, message: 'Please provide a valid domain name' };
-                if (parts.every(part => pattern.test(part))) return { success: true, message: 'Please provide a valid domain name' };
+                if (parts!.length < 2) return { success: false, message: 'Please provide a valid domain name' };
+                if (parts!.every(part => pattern.test(part))) return { success: true, message: 'Please provide a valid domain name' };
 
-                if (/\\|https?:\/\//.test(params.domain)) return {
+                if (/\\|https?:\/\//.test(params.domain!)) return {
                     success: false,
-                    message: params.domain.includes('\\') ? 'Error: escape sequence detected, please check your params' : 'Please provide a domain name without the http(s) protocol'
+                    message: params.domain?.includes('\\') ? 'Error: escape sequence detected, please check your params' : 'Please provide a domain name without the http(s) protocol'
                 };
 
                 const config: BlacklistConfig = { blacklist: BLACKLISTED_KEYWORDS };
                 const blacklisted = await this.domain.blacklisted({ domain: params.domain, config });
 
-                if (blacklisted) return { success: false, message: 'Domain name is blacklisted' };
+                if (blacklisted) {
+                    await this.prisma.domains.delete({ where: { name: params.domain } }).catch(() => { });
+                    return { success: false, message: 'This domain name is blacklisted, please choose a new one!' };
+                };
 
                 return { success: true, message: 'Domain name is valid' };
             },
@@ -112,6 +157,35 @@ export class Database implements DBClient {
                         resolve(exists);
                     })
                 })
+            },
+            listDomains: async (params: Parameters): Promise<ResponseLayout> => {
+
+                const { owner } = params;
+
+                if (!owner) return { success: false, message: 'Please provide a user to list domains for!' };
+
+                const domains = await this.prisma.domains.findMany({
+                    where: { user: owner },
+                    select: {
+                        name: true,
+                        createdAt: true,
+                        verified: true
+                    }
+                });
+
+                const user = await this.prisma.users.findUnique({ where: { userid: owner } });
+
+                if (!user) return { success: false, message: 'User not found' };
+                if (!domains) return { success: false, message: 'No domains found' };
+
+                return {
+                    success: true,
+                    message: 'Here is the requested users domains',
+                    data: {
+                        active: user.domain ? user.domain : 'No domain set',
+                        available: domains.length > 0 ? domains : 'No domains found'
+                    }
+                }
             }
         }
     }
@@ -123,6 +197,29 @@ export class Database implements DBClient {
 
                 return total;
             }
+        }
+    }
+
+    public get secret() {
+        return {
+            exists: async (key: string): Promise<Boolean> => {
+
+                const secrets = await this.prisma.secrets.findMany();
+
+                if (!secrets || secrets.length === 0) return false;
+
+                const keys = secrets.map((secret: any) => this.secret.decrypt(secret.key));
+
+                if (keys.length === 0) return false;
+
+                return keys.includes(key) ? true : false;
+            },
+            decrypt: (encryptedText: string): string => {
+                const decipher = crypto.createDecipheriv('aes-256-ctr', Buffer.from(process.env.ENCRYPTION_KEY as string, 'hex'), Buffer.alloc(16, 0));
+                const decrypted = Buffer.concat([decipher.update(Buffer.from(encryptedText, 'hex')), decipher.final()]);
+                return decrypted.toString('utf8');
+            },
+
         }
     }
 }

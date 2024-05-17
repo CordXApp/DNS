@@ -2,7 +2,7 @@ import "dotenv/config";
 import path from "node:path";
 import { version } from '../../package.json';
 import { Logger } from "../clients/other/log.client";
-import fastifyClient, { FastifyInstance } from 'fastify';
+import fastifyClient, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Database } from "../prisma/prisma.client";
 
 export class DNSServer {
@@ -24,6 +24,35 @@ export class DNSServer {
             strictPreflight: true,
             preflight: true
         });
+
+        this.app.register(require('@fastify/swagger'), {
+            routePrefix: '/docs',
+            exposeRoute: true,
+            hideUntagged: true,
+            swagger: {
+                host: 'dns.cordx.lol',
+                basePath: '/',
+                schemes: ['https', 'http'],
+                consumes: ['application/json'],
+                produces: ['application/json'],
+                info: {
+                    title: 'CordX DNS',
+                    description: 'Open-Source DNS Server for the CordX DNS System',
+                    version: version
+                },
+                tags: [
+                    { name: 'Root', description: 'Root Routes' },
+                    { name: 'DNS', description: 'DNS Routes' },
+                    { name: 'Users', description: 'User Routes' },
+                    { name: 'Admin', description: 'Admin Routes' }
+                ],
+            },
+            uiConf: { docExpansion: 'full', deepLinking: false },
+            uiHooks: {
+                onRequest: function (req: any, reply: any, next: any) { next() },
+                preHandler: function (req: any, reply: any, next: any) { next() },
+            }
+        })
 
         /** REGISTER ALL ROUTES */
         this.app.register(require('@fastify/autoload'), {
@@ -67,6 +96,7 @@ export class DNSServer {
 
         this.app.ready(err => {
             if (err) throw err;
+            this.app.swagger();
         });
 
         try {
@@ -87,6 +117,12 @@ export class DNSServer {
 
             process.exit(1);
         }
+    }
+}
+
+declare module "fastify" {
+    export interface FastifyInstance {
+        swagger: () => void;
     }
 }
 

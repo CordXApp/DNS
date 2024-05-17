@@ -1,3 +1,5 @@
+import { HTTPMethods } from "fastify";
+
 export interface User extends Document {
     id: number;
     owner: boolean;
@@ -16,7 +18,7 @@ export interface UserDomains {
 
 export interface Router {
     url: string;
-    method: string;
+    method: HTTPMethods | HTTPMethods[];
     schema?: any;
     preHandler?: any;
     handler: any;

@@ -21,9 +21,9 @@ export class BaseHandler {
         return {
             handler: (req: FastifyRequest, res: FastifyReply) => {
                 return res.status(200).send(JSON.stringify({
-                    name: `${PackageJSON.name}`,
-                    about: `${PackageJSON.description}`,
-                    version: `${PackageJSON.version}`,
+                    name: PackageJSON.name,
+                    about: PackageJSON.description,
+                    version: PackageJSON.version,
                     status: 'OK',
                     stats: {
                         uptime: formatUptime(process.uptime()),

@@ -9,7 +9,7 @@ export interface DBClient {
 }
 
 export interface Parameters {
-    domain: string;
+    domain?: string;
     owner?: string;
     config?: BlacklistConfig;
 }

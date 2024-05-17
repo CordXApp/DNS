@@ -1,29 +1,25 @@
-import { FastifyReply as OriginalFastifyReply } from 'fastify';
-
-export interface CordXResponse extends OriginalFastifyReply {
-    customResponse: (statusCode: number, body: {
-        status: string;
-        message: string;
-        code: number;
-    }) => CordXResponse;
-}
-
-export type CordXResponseType = new (reply: OriginalFastifyReply) => CordXResponse;
-
-export interface Query {
-    domain?: string;
-    user?: string;
-}
-
 export interface Request {
-    Querystring?: Query;
-    Params?: Params;
-    Headers?: {
-        Authorization?: string;
+    Body: Body;
+    Querystring: Query;
+    Params: Params;
+    Headers: {
+        Authorization: string
     }
 }
 
+export interface Body {
+    user: string;
+    domain: string;
+    secret: string;
+}
+
 export interface Params {
+    user?: string;
     domain?: string;
     secret?: string;
+}
+
+export interface Query {
+    user?: string;
+    domain?: string;
 }
