@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { Logger } from "../clients/other/log.client";
+import { Logger } from "../clients/log.client";
 import crypto from "node:crypto";
 import dns from "node:dns";
 import net from "node:net";
@@ -187,7 +187,7 @@ export class Database implements DBClient {
         if (blacklisted) {
           await this.prisma.domains
             .delete({ where: { name: params.domain } })
-            .catch(() => {});
+            .catch(() => { });
           return {
             success: false,
             message:
