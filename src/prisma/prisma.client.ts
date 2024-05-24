@@ -63,13 +63,17 @@ export class Database implements DBClient {
         if (!validate.success)
           return { success: false, message: validate.message };
 
-        const create = await this.prisma.domains.create({
+        const create = await this.prisma.users.update({
+          where: { userid: params.owner },
           data: {
-            name: params.domain,
-            content: crypto.randomBytes(15).toString("hex"),
-            verified: false,
-            user: params.owner,
-          },
+            domains: {
+              create: {
+                name: params.domain,
+                content: crypto.randomBytes(15).toString("hex"),
+                verified: false,
+              }
+            }
+          }
         });
 
         return {

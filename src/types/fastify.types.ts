@@ -20,6 +20,6 @@ export interface Params {
 }
 
 export interface Query {
-  user?: string;
   domain?: string;
+  secret?: string;
 }
