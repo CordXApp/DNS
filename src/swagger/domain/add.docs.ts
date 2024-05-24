@@ -1,26 +1,39 @@
 import { RouteSchema } from "../../types/base.types";
 
-export class ViewDomDocs {
+export class AddDomDocs {
     constructor() { }
 
     public static schema: RouteSchema = {
         tags: ["DNS"],
-        summary: "View the details of a domain",
-        description:
-            "View the details of a domain, including its records and other information",
+        summary: "Add a new user domain.",
+        description: "Add a new domain to a user for uploads and other services.",
+        params: {
+            type: "object",
+            properties: {
+                user: { type: "string" },
+            },
+        },
         querystring: {
             type: "object",
             properties: {
                 domain: { type: "string" },
-            },
+                secret: { type: "string" },
+            }
         },
         response: {
-            200: {
+            201: {
                 type: "object",
                 properties: {
-                    name: { type: "string" },
-                    createdAt: { type: "string" },
-                    verified: { type: "boolean" },
+                    status: { type: "string" },
+                    message: { type: "string" },
+                    data: {
+                        type: "object",
+                        properties: {
+                            name: { type: "string" },
+                            content: { type: "string" },
+                            verified: { type: "boolean" },
+                        }
+                    },
                 },
             },
             400: {

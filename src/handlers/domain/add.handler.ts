@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { Request } from "../../types/fastify.types";
 
-export class BaseHandler {
+export class AddDomHandler {
     constructor() { }
 
     public get get() {
@@ -18,32 +18,31 @@ export class BaseHandler {
 
     public get post() {
         return {
-            handler: async (req: FastifyRequest<{ Params: Request['Params'], Querystring: Request['Querystring'] }>, res: FastifyReply) => {
-                const { user } = req.params;
-                const { domain } = req.query
+            handler: async (req: FastifyRequest<{ Body: Request['Body'] }>, res: FastifyReply) => {
+                const { user, domain } = req.body;
 
-                const userCheck = await req.db.user.exists(user as string);
-
-                if (!userCheck) return res.status(404).send({
-                    status: 'USER_NOT_FOUND',
-                    message: 'Unable to locate your user data, please try again.',
-                    code: 404,
+                const create = await req.db.domain.create({
+                    owner: user,
+                    domain: domain
                 })
 
-                const domCheck = await req.db.domain.exists({ domain: domain as string })
-
-                if (domCheck) return res.status(409).send({
-                    status: 'DOMAIN_EXISTS',
-                    message: 'You already have a domain with that name.',
-                    code: 409,
+                if (!create.success) return res.status(500).send({
+                    status: 'INTERNAL_SERVER_ERROR',
+                    message: `Error: ${create.message}`,
+                    code: 500,
                 });
 
-
+                return res.status(201).send({
+                    status: 'DOMAIN_CREATED',
+                    message: 'Your domain has been successfully created.',
+                    data: create.data
+                })
             },
-            validate: async (req: FastifyRequest<{ Params: Request['Params'], Querystring: Request['Querystring'] }>, res: FastifyReply) => {
-                const { user } = req.params;
-                const { domain, secret } = req.query;
+            validate: async (req: FastifyRequest<{ Body: Request['Body'] }>, res: FastifyReply) => {
+                const { user, domain, secret } = req.body;
+
                 const userToCheck = await req.db.user.fetch(user as string);
+                const domCheck = await req.db.domain.exists({ domain: domain as string })
 
                 if (!user) return res.status(400).send({
                     status: 'USER_NOT_PROVIDED',
@@ -71,8 +70,14 @@ export class BaseHandler {
 
                 if (userToCheck.data.secret !== secret) return res.status(401).send({
                     status: 'INVALID_SECRET',
-                    message: 'The provided user secret is invalid, please check your credentials and try again.',
+                    message: 'Unable to validate user secret, please try again.',
                     code: 401,
+                });
+
+                if (domCheck) return res.status(404).send({
+                    status: 'DOMAIN_NOT_FOUND',
+                    message: 'You already have a domain with this name!',
+                    code: 404,
                 });
             }
         };

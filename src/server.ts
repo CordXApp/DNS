@@ -2,11 +2,7 @@ import "dotenv/config";
 import path from "node:path";
 import { version } from "../package.json";
 import { Logger } from "./clients/log.client";
-import fastifyClient, {
-  FastifyInstance,
-  FastifyReply,
-  FastifyRequest,
-} from "fastify";
+import fastifyClient, { FastifyInstance } from "fastify";
 import { Database } from "./prisma/prisma.client";
 
 export class DNSServer {
@@ -34,7 +30,7 @@ export class DNSServer {
       exposeRoute: true,
       hideUntagged: true,
       swagger: {
-        host: "dns.cordx.lol",
+        host: "localhost:10505",
         basePath: "/",
         schemes: ["https", "http"],
         consumes: ["application/json"],
@@ -78,24 +74,6 @@ export class DNSServer {
       res.header("User-Agent", `CordX:DNS/${version}`);
 
       done();
-    });
-
-    this.app.setErrorHandler((err: any, req, res) => {
-      this.logger.error(err.message);
-
-      if (err.validation)
-        return res.status(400).send({
-          message: "Bad Request",
-          error: err.validation,
-          code: 400,
-        });
-
-      if (err.code === 500 || err.statusCode === 500)
-        return res.status(500).send({
-          status: "INTERNAL_SERVER_ERROR",
-          message: `${err.message}`,
-          code: 500,
-        });
     });
 
     this.app.setNotFoundHandler((req, res) => {

@@ -4,7 +4,7 @@ export class ActiveDomDocs {
     constructor() { }
 
     public static get: RouteSchema = {
-        tags: ["DNS"],
+        tags: ["Users"],
         summary: "Get a users active domain",
         description: "Get the active domain of a user",
         params: {
@@ -58,7 +58,7 @@ export class ActiveDomDocs {
     };
 
     public static post: RouteSchema = {
-        tags: ["DNS"],
+        tags: ["Users"],
         summary: "Set a users active domain",
         description: "Set the active domain of a user",
         params: {

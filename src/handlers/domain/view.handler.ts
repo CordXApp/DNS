@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { ViewHandler } from "../../types/handlers/view.types";
-import { Params } from "../../types/fastify.types";
+import { Query } from "../../types/fastify.types";
 
 export class ViewDomHandler {
   constructor() { }
@@ -14,8 +14,8 @@ export class ViewDomHandler {
    */
   public get get(): ViewHandler {
     return {
-      handler: async (req: FastifyRequest<{ Params: Params }>, res: FastifyReply): Promise<void> => {
-        const { domain } = req.params;
+      handler: async (req: FastifyRequest<{ Querystring: Query }>, res: FastifyReply): Promise<void> => {
+        const { domain } = req.query;
 
         const dom = await req.db.domain.fetch({ domain: domain as string });
 
@@ -28,8 +28,8 @@ export class ViewDomHandler {
 
         return res.status(200).send(JSON.stringify(dom.data));
       },
-      validate: async (req: FastifyRequest<{ Params: Params }>, res: FastifyReply): Promise<void> => {
-        const { domain } = req.params;
+      validate: async (req: FastifyRequest<{ Querystring: Query }>, res: FastifyReply): Promise<void> => {
+        const { domain } = req.query;
 
         if (!domain)
           return res.status(400).send({

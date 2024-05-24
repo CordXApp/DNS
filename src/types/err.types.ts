@@ -1,4 +1,4 @@
-import { CordXError } from "../clients/other/error.client";
+import { CordXError } from "../clients/error.client";
 
 export const KeyErrors: { [status: string]: (details?: any) => CordXError } = {
   KEY_NOT_FOUND: (details) =>

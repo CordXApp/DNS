@@ -63,13 +63,15 @@ export class Database implements DBClient {
         if (!validate.success)
           return { success: false, message: validate.message };
 
+        const txtContent = crypto.randomBytes(15).toString("hex");
+
         const create = await this.prisma.users.update({
           where: { userid: params.owner },
           data: {
             domains: {
               create: {
                 name: params.domain,
-                content: crypto.randomBytes(15).toString("hex"),
+                content: txtContent,
                 verified: false,
               }
             }
@@ -79,7 +81,11 @@ export class Database implements DBClient {
         return {
           success: true,
           message: "Domain created successfully",
-          data: create,
+          data: {
+            name: params.domain,
+            content: txtContent,
+            verified: false
+          },
         };
       },
       fetch: async (params: Parameters): Promise<ResponseLayout> => {

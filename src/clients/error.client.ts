@@ -2,7 +2,7 @@ import {
   createKeyError,
   createTeaPotError,
   createRateLimitError,
-} from "../../res/errors";
+} from "../res/errors";
 
 export class CordXError extends Error {
   public code: number;
