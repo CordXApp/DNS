@@ -30,7 +30,7 @@ export class DNSServer {
       exposeRoute: true,
       hideUntagged: true,
       swagger: {
-        host: "localhost:10505",
+        host: "dns.cordx.lol",
         basePath: "/",
         schemes: ["https", "http"],
         consumes: ["application/json"],
