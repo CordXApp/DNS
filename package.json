@@ -3,11 +3,11 @@
   "version": "0.0.1-beta",
   "description": "Simple API for handling our DNS related services.",
   "license": "AGPL-3.0-only",
-  "main": "src/app.ts",
+  "main": "src/start.ts",
   "scripts": {
     "app:build": "tsc",
-    "app:dev": "nodemon src/app.ts",
-    "app:prod": "node build/app.js",
+    "app:dev": "nodemon src/start.ts",
+    "app:prod": "node build/start.js",
     "db:init": "prisma generate --schema=./src/prisma/schema.prisma",
     "db:push": "prisma db push --schema=./src/prisma/schema.prisma"
   },

@@ -47,8 +47,7 @@ export class DNSServer {
         tags: [
           { name: "Root", description: "Root Routes" },
           { name: "DNS", description: "DNS Routes" },
-          { name: "Users", description: "User Routes" },
-          { name: "Admin", description: "Admin Routes" },
+          { name: "Users", description: "User Routes" }
         ],
       },
       uiConf: { docExpansion: "full", deepLinking: false },

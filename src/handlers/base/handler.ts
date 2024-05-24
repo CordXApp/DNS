@@ -8,8 +8,8 @@ export class BaseHandler {
     return {
       handler: (req: FastifyRequest, res: FastifyReply) => {
         return res.status(200).send({
-          status: "OK",
-          message: "Hey there, do you know what you are doing here?",
+          message: "Welcome to the CordX DNS Server/API, please refer to the \`/docs\` end-point for more information!",
+          version: `v${PackageJSON.version}`,
           discord: "https://cordx.lol/discord",
           code: 200,
         });

@@ -1,25 +1,19 @@
 import { FastifyRequest, FastifyReply } from "fastify";
-import { Params, Request } from "../../types/fastify.types";
+import { Params } from "../../types/fastify.types";
 
-export class UserHandler {
+export class ListUserDomsHandler {
   constructor() { }
 
-  public get list() {
+  public get get() {
     return {
-      handler: async (
-        req: FastifyRequest<{ Params: Params }>,
-        res: FastifyReply,
-      ): Promise<void> => {
+      handler: async (req: FastifyRequest<{ Params: Params }>, res: FastifyReply): Promise<void> => {
         const { user } = req.params;
 
         const domains = await req.db.domain.listDomains({ owner: user });
 
         return res.status(200).send(JSON.stringify(domains.data));
       },
-      preHandler: async (
-        req: FastifyRequest<{ Params: Params }>,
-        res: FastifyReply,
-      ): Promise<void> => {
+      validate: async (req: FastifyRequest<{ Params: Params }>, res: FastifyReply): Promise<void> => {
         const { user } = req.params;
 
         if (!user)
@@ -44,7 +38,7 @@ export class UserHandler {
             message: domains.message,
             code: 500,
           });
-      },
+      }
     };
   }
 }

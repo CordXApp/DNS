@@ -12,6 +12,8 @@ export class ActiveDomHandler {
 
                 const active = await req.db.user.fetch(user as string);
 
+                console.log(active)
+
                 if (!active.success)
                     return res.status(500).send({
                         status: "ERROR_FETCHING_DOMAIN",

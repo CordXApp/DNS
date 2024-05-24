@@ -1,17 +1,18 @@
 import { Router } from "../../../types/base.types";
-import { UserHandler } from "../../../handlers/users/handler";
-import { UserDocs } from "../../../swagger/users/list.docs";
+import { ListUserDomsHandler } from "../../../handlers/users/list.handler";
+import { ListUserDomsDocs } from "../../../swagger/users/list.docs";
 import { FastifyInstance } from "fastify";
 
 export default async function (app: FastifyInstance) {
-  const { list } = new UserHandler();
+  const { get } = new ListUserDomsHandler();
+  const { schema } = ListUserDomsDocs;
 
   const route: Router = {
     url: "/:user/domains",
     method: "GET",
-    handler: list.handler,
-    preHandler: list.preHandler,
-    schema: UserDocs.ListDomains,
+    handler: get.handler,
+    preHandler: get.validate,
+    schema: schema,
   };
 
   app.route(route);

@@ -1,9 +1,9 @@
 import { RouteSchema } from "../../types/base.types";
 
-export class UserDocs {
+export class ListUserDomsDocs {
   constructor() { }
 
-  public static ListDomains: RouteSchema = {
+  public static schema: RouteSchema = {
     tags: ["Users"],
     summary: "List all of a users domains",
     description:
