@@ -7,7 +7,7 @@
   "scripts": {
     "app:build": "tsc",
     "app:dev": "nodemon src/start.ts",
-    "app:prod": "node build/start.js",
+    "app:prod": "node dist/src/start.js",
     "db:init": "prisma generate --schema=./src/prisma/schema.prisma",
     "db:push": "prisma db push --schema=./src/prisma/schema.prisma"
   },
