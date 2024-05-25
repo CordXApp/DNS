@@ -6,7 +6,7 @@ CordX DNS is a comprehensive RESTful API for managing our Domain Name System.
 ### Router
 The router is a key component of our application. It is responsible for directing incoming requests to the appropriate handler functions based on the request's URL and HTTP method.
 
-Our router is set up to handle routes listed at [dns.cordx.lol/docs](https://dns.cordx.lol)
+Our router is set up to handle routes listed at [dns.cordx.lol/docs](https://dns.cordx.lol/docs)
 
 Each route is associated with a handler function located in the [handlers](./src/server/handlers/) directory. These handler functions interact with the model layer of our application to retrieve or modify data.
 
