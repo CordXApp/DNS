@@ -1,5 +1,5 @@
-import { AddDomHandler } from "../../../../handlers/domain/add.handler";
-import { AddDomDocs } from "../../../../swagger/domain/add.docs";
+import { AddDomHandler } from "../../../../handlers/users/add.handler";
+import { AddDomDocs } from "../../../../swagger/users/add.docs";
 import { Router } from "../../../../types/base.types";
 import { FastifyInstance } from "fastify";
 

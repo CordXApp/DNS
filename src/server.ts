@@ -41,9 +41,9 @@ export class DNSServer {
           version: version,
         },
         tags: [
-          { name: "Root", description: "Root Routes" },
-          { name: "DNS", description: "DNS Routes" },
-          { name: "Users", description: "User Routes" }
+          { name: "Root", description: "Root server end-points" },
+          { name: "DNS", description: "Base DNS end-points" },
+          { name: "Users", description: "User DNS end-points" }
         ],
       },
       uiConf: { docExpansion: "full", deepLinking: false },

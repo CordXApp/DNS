@@ -9,7 +9,7 @@ export class ListUserDomsHandler {
       handler: async (req: FastifyRequest<{ Params: Params }>, res: FastifyReply): Promise<void> => {
         const { user } = req.params;
 
-        const domains = await req.db.domain.listDomains({ owner: user });
+        const domains = await req.db.domain.list({ owner: user });
 
         return res.status(200).send(JSON.stringify(domains.data));
       },
@@ -30,7 +30,7 @@ export class ListUserDomsHandler {
             code: 404,
           });
 
-        const domains = await req.db.domain.listDomains({ owner: user });
+        const domains = await req.db.domain.list({ owner: user });
 
         if (!domains.success)
           return res.status(500).send({

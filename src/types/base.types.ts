@@ -1,4 +1,5 @@
 import { HTTPMethods } from "fastify";
+import { BlacklistConfig, BLACKLISTED_KEYWORDS } from "./clients/db.types";
 
 export interface User extends Document {
   id: number;
@@ -35,3 +36,5 @@ export interface RouteSchema {
   body?: any;
   tags: string[];
 }
+
+export const BLACKLIST_CONFIG: BlacklistConfig = { blacklist: BLACKLISTED_KEYWORDS };

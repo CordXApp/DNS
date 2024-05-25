@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { Logger } from "../clients/log.client";
+import { BLACKLIST_CONFIG } from "../types/base.types";
 import crypto from "node:crypto";
 import dns from "node:dns";
 import net from "node:net";
@@ -8,8 +9,6 @@ import {
   DBClient,
   Parameters,
   ResponseLayout,
-  BlacklistConfig,
-  BLACKLISTED_KEYWORDS,
 } from "../types/clients/db.types";
 
 const prisma = new PrismaClient();
@@ -52,6 +51,34 @@ export class Database implements DBClient {
 
   public get domain() {
     return {
+      /**
+       * Calculates the age of a domain
+       * @param params
+       * @returns { number } the age of the domain
+       */
+      age: async (params: Parameters): Promise<ResponseLayout> => {
+        const domain = await this.domain.fetch({ domain: params.domain });
+
+        if (!domain.success) return { success: false, message: 'Domain not found' };
+
+        const currentDate = new Date();
+        const createdAt = new Date(domain.data.createdAt);
+        const ageInMilliseconds = currentDate.getTime() - createdAt.getTime();
+        const ageInDays = Math.floor(ageInMilliseconds / (1000 * 60 * 60 * 24));
+
+        return {
+          success: true,
+          message: 'Domain age calculated successfully!',
+          data: {
+            age: ageInDays,
+          }
+        }
+      },
+      /**
+       * Creates a domain in the database
+       * @param params
+       * @returns { ResponseLayout } the response layout
+       */
       create: async (params: Parameters): Promise<ResponseLayout> => {
         if (!params.domain)
           return { success: false, message: "Please provide a domain name" };
@@ -65,7 +92,7 @@ export class Database implements DBClient {
 
         const txtContent = crypto.randomBytes(15).toString("hex");
 
-        const create = await this.prisma.users.update({
+        await this.prisma.users.update({
           where: { userid: params.owner },
           data: {
             domains: {
@@ -88,6 +115,39 @@ export class Database implements DBClient {
           },
         };
       },
+      /**
+       * Deletes a domain from the database
+       * @param params
+       * @returns { ResponseLayout } the response layout
+       */
+      delete: async (params: Parameters): Promise<ResponseLayout> => {
+        const domain = await this.prisma.domains.findUnique({
+          where: { name: params.domain },
+        });
+
+        if (!domain)
+          return { success: false, message: "Domain not found" };
+
+        const deleted = await this.prisma.domains.delete({
+          where: { name: params.domain },
+        });
+
+        if (!deleted)
+          return {
+            success: false,
+            message: "Failed to delete domain, please try again!",
+          };
+
+        return {
+          success: true,
+          message: "Domain deleted successfully!",
+        };
+      },
+      /**
+       * Fetches a domain from the database
+       * @param params
+       * @returns { ResponseLayout } the domain data
+       */
       fetch: async (params: Parameters): Promise<ResponseLayout> => {
         const dom = await this.prisma.domains.findUnique({
           where: { name: params.domain },
@@ -101,6 +161,11 @@ export class Database implements DBClient {
           data: dom,
         };
       },
+      /**
+       * Checks if the domain exists in the database
+       * @param params
+       *  @returns { boolean } true if the domain exists
+       */
       exists: async (params: Parameters): Promise<boolean> => {
         const dom = await this.prisma.domains.findUnique({
           where: { name: params.domain },
@@ -108,10 +173,16 @@ export class Database implements DBClient {
 
         return dom ? true : false;
       },
-      setActive: async (params: Parameters): Promise<ResponseLayout> => {
-        const user = await this.prisma.users.findUnique({
-          where: { userid: params.owner },
-        });
+      /**
+       * Sets the active domain for a user
+       * @param params
+       * @returns { ResponseLayout } the response layout
+       */
+      active: async (params: Parameters): Promise<ResponseLayout> => {
+
+        this.logs.debug(`User: ${params.owner} is trying to set domain: ${params.domain}`);
+
+        const user = await this.prisma.users.findUnique({ where: { userid: params.owner } });
         const valid = await this.domain.validate({ domain: params.domain });
 
         if (!user)
@@ -123,7 +194,7 @@ export class Database implements DBClient {
         if (!valid.success) return { success: false, message: valid.message };
 
         if (user.domain === params.domain)
-          return { success: true, message: "This domain is already active!" };
+          return { success: false, message: "This domain is already active!" };
 
         const update = await this.prisma.users.update({
           where: { userid: params.owner },
@@ -142,6 +213,11 @@ export class Database implements DBClient {
           message: "Active domain updated successfully!",
         };
       },
+      /**
+       * Checks if the domain is blacklisted
+       * @param params
+       * @returns { boolean } true if the domain is blacklisted
+       */
       blacklisted: async (params: Parameters): Promise<boolean> => {
         const isBlacklisted = params.config?.blacklist.some((word) =>
           params.domain?.includes(word),
@@ -149,12 +225,11 @@ export class Database implements DBClient {
 
         return isBlacklisted ? true : false;
       },
-      removeSubdomain: (params: Parameters): string => {
-        const parts = params.domain?.split(".");
-        const root = parts!.slice(-2).join(".");
-
-        return root;
-      },
+      /**
+       * Validates the domain name
+       * @param params
+       * @returns { ResponseLayout } the validation response
+       */
       validate: async (params: Parameters): Promise<ResponseLayout> => {
         const isNotIP = net.isIP(params.domain!) != 0;
 
@@ -188,10 +263,9 @@ export class Database implements DBClient {
               : "Please provide a domain name without the http(s) protocol",
           };
 
-        const config: BlacklistConfig = { blacklist: BLACKLISTED_KEYWORDS };
         const blacklisted = await this.domain.blacklisted({
           domain: params.domain,
-          config,
+          config: BLACKLIST_CONFIG,
         });
 
         if (blacklisted) {
@@ -201,33 +275,105 @@ export class Database implements DBClient {
           return {
             success: false,
             message:
-              "This domain name is blacklisted, please choose a new one!",
+              "The provided domain is blacklisted, please provide a valid domain name!",
           };
         }
 
         return { success: true, message: "Domain name is valid" };
       },
-      verifyRecord: (params: Parameters): Promise<boolean> => {
-        return new Promise(async (resolve, reject) => {
-          const domain = await this.domain.fetch({ domain: params.domain });
+      /**
+       * Verifies the domain by checking the DNS records
+       * @param params
+       * @returns { boolean } true if the domain is verified
+       */
+      verified: async (params: Parameters): Promise<any> => {
+        const domain = await this.domain.fetch({ domain: params.domain });
 
-          if (!domain.success) return reject(false);
+        if (!domain.success) return {
+          success: false,
+          message: domain.message,
+        }
 
-          dns.resolve(
-            this.domain.removeSubdomain({ domain: params.domain }),
-            (err, records) => {
-              if (err) return reject(false);
+        dns.resolveTxt(this.domain.split({ domain: params.domain }), (err, txtRecords) => {
+          if (err) return {
+            success: false,
+            message: err.message
+          }
 
-              const exists = records.some((record) =>
-                record.includes(domain.data.content),
-              );
+          const txtExists = txtRecords.some((record) => record.includes(domain.data.content));
 
-              resolve(exists);
-            },
-          );
+          if (!txtExists) return {
+            success: false,
+            message: 'Whoops, the provided domain does not have the required TXT record!'
+          }
+
+          dns.resolveCname(params.domain as string, async (err, cnameRecords) => {
+            if (err && err.code !== 'ENODATA') return {
+              success: false,
+              message: err.message
+            }
+
+            const cnameExists = cnameRecords && cnameRecords.some((record) => record.includes(params.domain as string));
+
+            if (!cnameExists) {
+              dns.resolve4(params.domain as string, (err, aRecords) => {
+                if (err) return {
+                  success: false,
+                  message: err.message
+                }
+
+                dns.resolve4(params.domain as string, (err, ips) => {
+                  if (err) return {
+                    success: false,
+                    message: err.message
+                  }
+
+                  const ipExists = ips.some((ip) => aRecords.includes(ip));
+
+                  return {
+                    success: ipExists,
+                    message: ipExists ? 'Domain ownership verified!' : 'Whoops, the provided domain does not have the required CNAME record'
+                  }
+                });
+              });
+            } else {
+              return {
+                success: true,
+                message: 'Domain ownership verified!'
+              }
+            }
+          });
         });
+
+        return {
+          success: false,
+          message: 'Whoops, one or more of the required DNS records are missing!'
+        }
       },
-      listDomains: async (params: Parameters): Promise<ResponseLayout> => {
+      expired: async (params: Parameters): Promise<boolean> => {
+        const domain = await this.domain.fetch({ domain: params.domain });
+
+        if (!domain.success) return false;
+
+        const currentDate = new Date();
+        const createdAt = new Date(domain.data.createdAt);
+        const ageInMilliseconds = currentDate.getTime() - createdAt.getTime();
+        const ageInDays = Math.floor(ageInMilliseconds / (1000 * 60 * 60 * 24));
+
+        const expired = ageInDays >= 30 && !domain.data.verified ? true : false;
+
+        if (expired) await this.domain.delete({ domain: params.domain }).catch((err: Error) => {
+          this.logs.error(`Failed to delete expired domain: ` + err.message);
+        });
+
+        return expired;
+      },
+      /**
+       * Lists all domains for a given user
+       * @param params
+       * @returns { ResponseLayout } the users domains
+       */
+      list: async (params: Parameters): Promise<ResponseLayout> => {
         const { owner } = params;
 
         if (!owner)
@@ -261,6 +407,28 @@ export class Database implements DBClient {
           },
         };
       },
+      /**
+       * Splits the domain and removes any "sub" domains
+       * @param params
+       * @returns { string } the root domain
+       */
+      split: (params: Parameters): string => {
+        const parts = params.domain?.split(".");
+        const root = parts!.slice(-2).join(".");
+
+        return root;
+      },
+      /**
+       * Splits the domain and removes the root domain
+       * @param params
+       * @returns { string } the sub domain
+       */
+      sub: (params: Parameters): string => {
+        const parts = params.domain?.split(".");
+        const sub = parts!.slice(0, -2).join(".");
+
+        return sub;
+      }
     };
   }
 

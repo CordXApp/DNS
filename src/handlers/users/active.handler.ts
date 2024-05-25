@@ -12,8 +12,6 @@ export class ActiveDomHandler {
 
                 const active = await req.db.user.fetch(user as string);
 
-                console.log(active)
-
                 if (!active.success)
                     return res.status(500).send({
                         status: "ERROR_FETCHING_DOMAIN",
@@ -51,9 +49,10 @@ export class ActiveDomHandler {
     public get post(): ActiveDom['post'] {
         return {
             handler: async (req: FastifyRequest<Request>, res: FastifyReply): Promise<void> => {
-                const { user, domain } = req.body;
+                const { user } = req.params;
+                const { domain } = req.body;
 
-                const active = await req.db.domain.setActive({ owner: user, domain });
+                const active = await req.db.domain.active({ owner: user, domain });
 
                 if (!active.success)
                     return res.status(500).send({
@@ -65,6 +64,7 @@ export class ActiveDomHandler {
                 return res.status(200).send({
                     status: "OK",
                     message: "Domain activated successfully",
+                    code: 200
                 });
             },
             validate: async (req: FastifyRequest<Request>, res: FastifyReply): Promise<void> => {
@@ -94,7 +94,9 @@ export class ActiveDomHandler {
                         code: 404,
                     });
 
-                if (!(await req.db.secret.exists(secret)))
+                const uuser = await req.db.user.fetch(user as string);
+
+                if (uuser.data.secret !== secret)
                     return res.status(401).send({
                         status: "INVALID_SECRET",
                         message: "The secret you provided is invalid",
@@ -108,7 +110,7 @@ export class ActiveDomHandler {
                         code: 404,
                     });
 
-                if (!(await req.db.domain.verifyRecord({ domain })))
+                if (!(await req.db.domain.verified({ domain })))
                     return res.status(401).send({
                         status: "DOMAIN_NOT_VERIFIED",
                         message:

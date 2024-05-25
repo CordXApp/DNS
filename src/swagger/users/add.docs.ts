@@ -4,7 +4,7 @@ export class AddDomDocs {
     constructor() { }
 
     public static schema: RouteSchema = {
-        tags: ["DNS"],
+        tags: ["Users"],
         summary: "Add a new user domain.",
         description: "Add a new domain to a user for uploads and other services.",
         params: {

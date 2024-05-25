@@ -43,6 +43,7 @@ export class AddDomHandler {
 
                 const userToCheck = await req.db.user.fetch(user as string);
                 const domCheck = await req.db.domain.exists({ domain: domain as string })
+                const validate = await req.db.domain.validate({ domain: domain as string });
 
                 if (!user) return res.status(400).send({
                     status: 'USER_NOT_PROVIDED',
@@ -59,6 +60,12 @@ export class AddDomHandler {
                 if (!secret) return res.status(400).send({
                     status: 'SECRET_NOT_PROVIDED',
                     message: 'No secret was provided in the request.',
+                    code: 400,
+                });
+
+                if (!validate.success) return res.status(400).send({
+                    status: 'INVALID_DOMAIN',
+                    message: validate.message,
                     code: 400,
                 });
 

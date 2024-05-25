@@ -78,9 +78,9 @@ export class ActiveDomDocs {
             200: {
                 type: "object",
                 properties: {
-                    name: { type: "string" },
-                    createdAt: { type: "string" },
-                    verified: { type: "boolean" },
+                    status: { type: "string" },
+                    message: { type: "string" },
+                    code: { type: "number" },
                 },
             },
             400: {
