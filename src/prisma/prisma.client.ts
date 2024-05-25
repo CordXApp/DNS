@@ -286,7 +286,7 @@ export class Database implements DBClient {
        * @param params
        * @returns { boolean } true if the domain is verified
        */
-      verified: async (params: Parameters): Promise<any> => {
+      verified: async (params: Parameters): Promise<ResponseLayout> => {
         const domain = await this.domain.fetch({ domain: params.domain });
 
         if (!domain.success) return {
@@ -294,60 +294,51 @@ export class Database implements DBClient {
           message: domain.message,
         }
 
-        dns.resolveTxt(this.domain.split({ domain: params.domain }), (err, txtRecords) => {
-          if (err) return {
-            success: false,
-            message: err.message
-          }
+        /** VERIFY THE TXT RECORD AND ITS CONTENT */
+        const txtRecords: any = await new Promise((resolve, reject) => {
+          dns.resolveTxt(this.domain.split({ domain: params.domain }), (err, records) => {
+            if (err) reject(err);
+            resolve(records);
+          })
+        })
 
-          const txtExists = txtRecords.some((record) => record.includes(domain.data.content));
+        const txtExists = txtRecords.some((record) => record.includes(domain.data.content));
 
-          if (!txtExists) return {
-            success: false,
-            message: 'Whoops, the provided domain does not have the required TXT record!'
-          }
+        if (!txtExists) return { success: false, message: 'Whoops, looks like the provided domain is missing the required TXT record!' };
 
-          dns.resolveCname(params.domain as string, async (err, cnameRecords) => {
-            if (err && err.code !== 'ENODATA') return {
-              success: false,
-              message: err.message
-            }
-
-            const cnameExists = cnameRecords && cnameRecords.some((record) => record.includes(params.domain as string));
-
-            if (!cnameExists) {
-              dns.resolve4(params.domain as string, (err, aRecords) => {
-                if (err) return {
-                  success: false,
-                  message: err.message
-                }
-
-                dns.resolve4(params.domain as string, (err, ips) => {
-                  if (err) return {
-                    success: false,
-                    message: err.message
-                  }
-
-                  const ipExists = ips.some((ip) => aRecords.includes(ip));
-
-                  return {
-                    success: ipExists,
-                    message: ipExists ? 'Domain ownership verified!' : 'Whoops, the provided domain does not have the required CNAME record'
-                  }
-                });
-              });
-            } else {
-              return {
-                success: true,
-                message: 'Domain ownership verified!'
-              }
-            }
-          });
+        /** CHECK IF THE DOMAIN HAS A CNAME RECORD */
+        const cnameRecords: any = await new Promise((resolve, reject) => {
+          dns.resolveCname(params.domain as string, (err, records) => {
+            if (err && err.code !== 'ENODATA') reject(err);
+            resolve(records);
+          })
         });
 
+        const cnameExists = cnameRecords && cnameRecords.some((record) => record.includes(params.domain));
+
+        if (cnameExists && txtExists) return { success: true, message: 'Domain ownership verified!' };
+
+        /** RESOLVE THE DOMAIN TO AN IP ADDRESS (FOR CNAME FLATTENING) */
+        const aRecords: string[] = await new Promise((resolve, reject) => {
+          dns.resolve4(params.domain as string, (err, records) => {
+            if (err) reject(err);
+            resolve(records);
+          })
+        });
+
+        /** RESOLVE THE IP FROM ABOVE AGAIN AND CHECK IF ITS A VALID RECORD */
+        const ips: string[] = await new Promise((resolve, reject) => {
+          dns.resolve4(params.domain as string, (err, records) => {
+            if (err) reject(err);
+            resolve(records);
+          })
+        });
+
+        const ipExists = ips.some((ip: string) => aRecords.includes(ip));
+
         return {
-          success: false,
-          message: 'Whoops, one or more of the required DNS records are missing!'
+          success: (ipExists || cnameExists) && txtExists,
+          message: (ipExists || cnameExists) && txtExists ? 'Domain ownership verified!' : 'Whoops, looks like the provided domain is missing one of the required records!'
         }
       },
       expired: async (params: Parameters): Promise<boolean> => {

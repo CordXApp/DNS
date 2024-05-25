@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { Request } from "../../types/fastify.types";
 import { BLACKLIST_CONFIG } from "../../types/base.types";
+import { ResponseLayout } from "../../types/clients/db.types";
 
 export class VerifyDomHandler {
     constructor() { }
@@ -26,9 +27,9 @@ export class VerifyDomHandler {
 
                 const records = await req.db.domain.verified({ domain });
 
-                if (!records!.success) return res.status(400).send({
+                if (!records.success) return res.status(400).send({
                     status: 'DOMAIN_VERIFICATION_FAILED',
-                    message: records!.message,
+                    message: records.message,
                     code: 400
                 });
 
