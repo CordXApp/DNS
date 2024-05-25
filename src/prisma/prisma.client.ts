@@ -294,51 +294,72 @@ export class Database implements DBClient {
           message: domain.message,
         }
 
-        /** VERIFY THE TXT RECORD AND ITS CONTENT */
+        const nsRecords: string[] = await new Promise((resolve, reject) => {
+          dns.resolveNs(this.domain.split({ domain: params.domain }), (err, records) => {
+            if (err) reject(err);
+            resolve(records);
+          });
+        });
+
         const txtRecords: any = await new Promise((resolve, reject) => {
           dns.resolveTxt(this.domain.split({ domain: params.domain }), (err, records) => {
-            if (err) reject(err);
+            if (err && err.code !== 'ENODATA') reject(err);
             resolve(records);
           })
         })
 
-        const txtExists = txtRecords.some((record) => record.includes(domain.data.content));
+        const txtExists = txtRecords && txtRecords.some((record) => record.includes(domain.data.content));
 
-        if (!txtExists) return { success: false, message: 'Whoops, looks like the provided domain is missing the required TXT record!' };
+        if (!txtExists) return {
+          success: false,
+          message: `Unable to locate the required TXT Record for: ${this.domain.split({ domain: params.domain })}`
+        };
 
-        /** CHECK IF THE DOMAIN HAS A CNAME RECORD */
-        const cnameRecords: any = await new Promise((resolve, reject) => {
+        if (nsRecords && nsRecords.some(nsRecord => nsRecord.includes('ns.cloudflare.com'))) {
+          const aRecords: string[] = await new Promise((resolve, reject) => {
+            dns.resolve4(params.domain as string, (err, records) => {
+              if (err) reject(err);
+              resolve(records);
+            })
+          });
+
+          const ips: string[] = await new Promise((resolve, reject) => {
+            dns.resolve4(params.domain as string, (err, records) => {
+              if (err) reject(err);
+              resolve(records);
+            })
+          });
+
+          const ipExists = ips && ips.some((ip) => aRecords.includes(ip));
+
+          if (ipExists && txtExists) return {
+            success: true,
+            message: "Domain verified successfully!"
+          };
+
+          return {
+            success: false,
+            message: `Whoops, we were unable to locate one or more required DNS records for: ${params.domain}`,
+          }
+        }
+
+        const cnameRecords: string[] = await new Promise((resolve, reject) => {
           dns.resolveCname(params.domain as string, (err, records) => {
             if (err && err.code !== 'ENODATA') reject(err);
             resolve(records);
           })
         });
 
-        const cnameExists = cnameRecords && cnameRecords.some((record) => record.includes(params.domain));
+        const cnameExists = cnameRecords && cnameRecords.some((record) => record.includes(params.domain as string));
 
-        if (cnameExists && txtExists) return { success: true, message: 'Domain ownership verified!' };
-
-        /** RESOLVE THE DOMAIN TO AN IP ADDRESS (FOR CNAME FLATTENING) */
-        const aRecords: string[] = await new Promise((resolve, reject) => {
-          dns.resolve4(params.domain as string, (err, records) => {
-            if (err) reject(err);
-            resolve(records);
-          })
-        });
-
-        /** RESOLVE THE IP FROM ABOVE AGAIN AND CHECK IF ITS A VALID RECORD */
-        const ips: string[] = await new Promise((resolve, reject) => {
-          dns.resolve4(params.domain as string, (err, records) => {
-            if (err) reject(err);
-            resolve(records);
-          })
-        });
-
-        const ipExists = ips.some((ip: string) => aRecords.includes(ip));
+        if (cnameExists && txtExists) return {
+          success: true,
+          message: `Domain verified successfully!`
+        };
 
         return {
-          success: (ipExists || cnameExists) && txtExists,
-          message: (ipExists || cnameExists) && txtExists ? 'Domain ownership verified!' : 'Whoops, looks like the provided domain is missing one of the required records!'
+          success: false,
+          message: `Whoops, we were unable to locate one or more required DNS records for: ${params.domain}`,
         }
       },
       expired: async (params: Parameters): Promise<boolean> => {
