@@ -1,6 +1,6 @@
 {
   "name": "@cordxapp/dns",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Simple API for handling our DNS related services.",
   "license": "AGPL-3.0-only",
   "main": "src/start.ts",
